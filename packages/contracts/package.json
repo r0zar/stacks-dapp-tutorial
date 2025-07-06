@@ -4,7 +4,30 @@
   "description": "Run unit tests on this project.",
   "type": "module",
   "private": true,
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/es/index.js",
+  "module": "./dist/es/index.js",
+  "types": "./dist/es/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/es/index.d.ts",
+        "default": "./dist/es/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.cjs"
+      }
+    }
+  },
   "scripts": {
+    "build": "bunchee",
+    "dev": "bunchee --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:report": "vitest run -- --coverage --costs",
     "test:watch": "chokidar \"tests/**/*.ts\" \"contracts/**/*.clar\" -c \"npm run test:report\""
@@ -19,5 +42,9 @@
     "vite": "^6.1.0",
     "vitest": "^3.0.0",
     "vitest-environment-clarinet": "^2.3.0"
+  },
+  "devDependencies": {
+    "bunchee": "^6.5.4",
+    "eslint": "^9.30.0"
   }
 }

@@ -6,7 +6,7 @@ telemetry = false
 cache_dir = "./.cache"
 
 [contracts.token]
-path = "src/token.clar"
+path = "src/clarity/token.clar"
 clarity_version = 3
 epoch = 3.0
 
