@@ -4,7 +4,7 @@ import { Wallet, Globe, TrendingUp, Users } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import { useTokenContract } from '../contexts/TokenContractContext';
-import { formatTokenAmount, formatNumber, formatAddress } from '../utils/formatting';
+import { formatTokenAmount, formatAddress } from '../utils/formatting';
 
 interface HeroProps {
   onNavigate?: (page: 'balance' | 'transfer') => void;
