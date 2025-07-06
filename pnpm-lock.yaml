@@ -15,6 +15,82 @@ importers:
         specifier: 2.5.0
         version: 2.5.0
 
+  apps/faucet:
+    dependencies:
+      '@headlessui/react':
+        specifier: ^2.2.4
+        version: 2.2.4(react-dom@19.1.0)(react@19.1.0)
+      '@stacks/auth':
+        specifier: ^7.1.0
+        version: 7.1.0
+      '@stacks/connect':
+        specifier: ^8.1.9
+        version: 8.1.9
+      '@stacks/transactions':
+        specifier: ^6.12.0
+        version: 6.17.0
+      '@tailwindcss/forms':
+        specifier: ^0.5.10
+        version: 0.5.10(tailwindcss@4.1.11)
+      '@tailwindcss/vite':
+        specifier: ^4.1.11
+        version: 4.1.11(vite@6.3.5)
+      contracts:
+        specifier: workspace:^
+        version: link:../../packages/contracts
+      framer-motion:
+        specifier: ^12.23.0
+        version: 12.23.0(react-dom@19.1.0)(react@19.1.0)
+      lucide-react:
+        specifier: ^0.525.0
+        version: 0.525.0(react@19.1.0)
+      react:
+        specifier: ^19.1.0
+        version: 19.1.0
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.1.0(react@19.1.0)
+      react-router-dom:
+        specifier: ^7.6.3
+        version: 7.6.3(react-dom@19.1.0)(react@19.1.0)
+      tailwindcss:
+        specifier: ^4.1.11
+        version: 4.1.11
+    devDependencies:
+      '@eslint/js':
+        specifier: ^9.25.0
+        version: 9.30.1
+      '@types/react':
+        specifier: ^19.1.2
+        version: 19.1.8
+      '@types/react-dom':
+        specifier: ^19.1.2
+        version: 19.1.6(@types/react@19.1.8)
+      '@vitejs/plugin-react':
+        specifier: ^4.4.1
+        version: 4.6.0(vite@6.3.5)
+      eslint:
+        specifier: ^9.25.0
+        version: 9.30.1
+      eslint-plugin-react-hooks:
+        specifier: ^5.2.0
+        version: 5.2.0(eslint@9.30.1)
+      eslint-plugin-react-refresh:
+        specifier: ^0.4.19
+        version: 0.4.20(eslint@9.30.1)
+      globals:
+        specifier: ^16.0.0
+        version: 16.3.0
+      typescript:
+        specifier: ~5.8.3
+        version: 5.8.3
+      typescript-eslint:
+        specifier: ^8.30.1
+        version: 8.35.1(eslint@9.30.1)(typescript@5.8.3)
+      vite:
+        specifier: ^6.3.5
+        version: 6.3.5
+
   apps/my-token:
     dependencies:
       '@headlessui/react':
@@ -143,8 +219,8 @@ importers:
   packages/contracts:
     dependencies:
       '@hirosystems/clarinet-sdk':
-        specifier: ^2.14.0
-        version: 2.16.0
+        specifier: ^3.2.0
+        version: 3.2.0
       '@stacks/connect':
         specifier: ^8.1.9
         version: 8.1.9
@@ -165,7 +241,7 @@ importers:
         version: 3.2.4
       vitest-environment-clarinet:
         specifier: ^2.3.0
-        version: 2.3.0(@hirosystems/clarinet-sdk@2.16.0)(vitest@3.2.4)
+        version: 2.3.0(@hirosystems/clarinet-sdk@3.2.0)(vitest@3.2.4)
     devDependencies:
       bunchee:
         specifier: ^6.5.4
@@ -1845,7 +1921,7 @@ packages:
 
   /@expo/bunyan@4.0.1:
     resolution: {integrity: sha512-+Lla7nYSiHZirgK+U/uYzsLv/X+HaJienbD5AKX1UQZHYfWaP+9uuQluRB4GrEVWF0GZ7vEVp/jzaOT9k/SQlg==}
-    engines: {node: '>=0.10.0'}
+    engines: {'0': node >=0.10.0}
     dependencies:
       uuid: 8.3.2
 
@@ -2303,42 +2379,21 @@ packages:
       use-sync-external-store: 1.5.0(react@19.1.0)
     dev: false
 
-  /@hirosystems/clarinet-sdk-wasm@2.16.0:
-    resolution: {integrity: sha512-d3CiXMOgLhgyvfbiL4nn0pTEyH0T0qYF9qlTegOw7avXmwwSQ1ZvnQxOQhPg7FyMfim2mnMtmyxmc7/I3v3S1g==}
+  /@hirosystems/clarinet-sdk-wasm@3.2.0:
+    resolution: {integrity: sha512-4+3b+7HPssAY2evIPs7qkWWnpl4E4niK8kNL9dKGHEV4Ocjgaze4dUB30xFnj7N4pP8HKHDz3cg+U8g9sYQPQg==}
     dev: false
 
-  /@hirosystems/clarinet-sdk@2.16.0:
-    resolution: {integrity: sha512-/JfNSU+u6Lr+Ca0h7KCka+Rs+1K8rs4ln8wfRyYUwsu8gEPWOVCqivVjXpbkAjPLbGxVilpVeTSKvadrClGg8A==}
+  /@hirosystems/clarinet-sdk@3.2.0:
+    resolution: {integrity: sha512-3azrA8d1S34wPc/g0sjP8/DDm+8O7N9+5WRY+R58Jef54/d+6kvo6SfMX8kHCchucSJnFfXq1Hkdl2rgzPoC5Q==}
     engines: {node: '>=18.0.0'}
-    hasBin: true
     dependencies:
-      '@hirosystems/clarinet-sdk-wasm': 2.16.0
-      '@stacks/transactions': 6.17.0
+      '@hirosystems/clarinet-sdk-wasm': 3.2.0
+      '@stacks/transactions': 7.1.0
       kolorist: 1.8.0
       prompts: 2.4.2
-      vitest: 3.2.4
       yargs: 17.7.2
     transitivePeerDependencies:
-      - '@edge-runtime/vm'
-      - '@types/debug'
-      - '@types/node'
-      - '@vitest/browser'
-      - '@vitest/ui'
       - encoding
-      - happy-dom
-      - jiti
-      - jsdom
-      - less
-      - lightningcss
-      - msw
-      - sass
-      - sass-embedded
-      - stylus
-      - sugarss
-      - supports-color
-      - terser
-      - tsx
-      - yaml
     dev: false
 
   /@humanfs/core@0.19.1:
@@ -5241,6 +5296,11 @@ packages:
     resolution: {integrity: sha512-6DnInpx7SJ2AK3+CTUE/ZM0vWTUboZCegxhC2xiIydHR9jNuTAASBrfEpHhiGOZw/nX51bHt6YQl8jsGo4y/0w==}
     engines: {node: '>= 0.6'}
     dev: true
+
+  /cookie@1.0.2:
+    resolution: {integrity: sha512-9Kr/j4O16ISv8zBBhJoi4bXOYNTkFLOqSL3UDB0njXxCXNezjeyVrJyGOWtgfs/q2km1gwBcfH8q1yEGoMYunA==}
+    engines: {node: '>=18'}
+    dev: false
 
   /copy-webpack-plugin@10.2.4(webpack@5.99.9):
     resolution: {integrity: sha512-xFVltahqlsRcyyJqQbDY6EYTtyQZF9rf+JPjwHObLdPFMEISqkFkr7mFoVOC6BfYS/dNThyoQKvziugm+OnwBg==}
@@ -9401,6 +9461,34 @@ packages:
     engines: {node: '>=0.10.0'}
     dev: true
 
+  /react-router-dom@7.6.3(react-dom@19.1.0)(react@19.1.0):
+    resolution: {integrity: sha512-DiWJm9qdUAmiJrVWaeJdu4TKu13+iB/8IEi0EW/XgaHCjW/vWGrwzup0GVvaMteuZjKnh5bEvJP/K0MDnzawHw==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+    dependencies:
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
+      react-router: 7.6.3(react-dom@19.1.0)(react@19.1.0)
+    dev: false
+
+  /react-router@7.6.3(react-dom@19.1.0)(react@19.1.0):
+    resolution: {integrity: sha512-zf45LZp5skDC6I3jDLXQUu0u26jtuP4lEGbc7BbdyxenBN1vJSTA18czM2D+h5qyMBuMrD+9uB+mU37HIoKGRA==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      react: '>=18'
+      react-dom: '>=18'
+    peerDependenciesMeta:
+      react-dom:
+        optional: true
+    dependencies:
+      cookie: 1.0.2
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
+      set-cookie-parser: 2.7.1
+    dev: false
+
   /react@18.3.1:
     resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
     engines: {node: '>=0.10.0'}
@@ -9879,6 +9967,10 @@ packages:
 
   /set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
+    dev: false
+
+  /set-cookie-parser@2.7.1:
+    resolution: {integrity: sha512-IOc8uWeOZgnb3ptbCURJWNjWUPcO3ZnTTdzsurqERrP6nPyv+paC55vJM0LpOlT2ne+Ix+9+CRG1MNLlyZ4GjQ==}
     dev: false
 
   /setimmediate@1.0.5:
@@ -10851,13 +10943,13 @@ packages:
     optionalDependencies:
       fsevents: 2.3.3
 
-  /vitest-environment-clarinet@2.3.0(@hirosystems/clarinet-sdk@2.16.0)(vitest@3.2.4):
+  /vitest-environment-clarinet@2.3.0(@hirosystems/clarinet-sdk@3.2.0)(vitest@3.2.4):
     resolution: {integrity: sha512-SZLrQZ9CFzTIes54a2Sw1ijOa718yyFIEAd38IbpfHZL2gY8nwM/IqKsjCrVCcrD9+/hO83V0fTJoFqZR1262Q==}
     peerDependencies:
       '@hirosystems/clarinet-sdk': '>=2.14.0'
       vitest: ^1.0.0 || ^2.0.0 || ^3.0.0
     dependencies:
-      '@hirosystems/clarinet-sdk': 2.16.0
+      '@hirosystems/clarinet-sdk': 3.2.0
       vitest: 3.2.4
     dev: false
 

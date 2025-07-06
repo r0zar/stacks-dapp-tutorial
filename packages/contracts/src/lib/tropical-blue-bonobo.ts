@@ -2,6 +2,7 @@ import { fetchCallReadOnlyFunction, cvToJSON, cvToValue, NoneCV, noneCV, Pc, pri
 import { request } from '@stacks/connect';
 import { Cl } from '@stacks/transactions';
 import { CallContractParams } from '@stacks/connect/dist/types/methods';
+import { getCacheEntry, setCacheEntry, removeCacheEntriesByPrefix } from './serializers';
 
 // Contract details by network
 const CONTRACT_ADDRESSES = {
@@ -48,8 +49,8 @@ export interface ContractCallResult {
 
 type NetworkType = 'mainnet' | 'testnet';
 
-interface CacheEntry<T> {
-  data: T;
+interface SerializableCacheEntry {
+  data: any;
   timestamp: number;
   ttl: number;
 }
@@ -61,7 +62,7 @@ interface CacheEntry<T> {
 export class TropicalBlueBonoboToken {
   private readonly contractName: string;
   private readonly network: NetworkType;
-  private readonly cache = new Map<string, CacheEntry<any>>();
+  private readonly cachePrefix: string;
 
   // Cache TTL in milliseconds
   private readonly STATIC_DATA_TTL = 60 * 60 * 1000; // 1 hour for static data (name, symbol, decimals)
@@ -70,6 +71,47 @@ export class TropicalBlueBonoboToken {
   constructor(network: NetworkType = DEFAULT_NETWORK as NetworkType) {
     this.contractName = CONTRACT_NAME;
     this.network = network;
+    this.cachePrefix = `tbb-token-cache:${this.network}:`;
+  }
+
+  /**
+   * Serialize data for localStorage (handles BigInt)
+   */
+  private serializeCacheData(data: any): any {
+    if (typeof data === 'bigint') {
+      return { __type: 'bigint', value: data.toString() };
+    }
+    if (Array.isArray(data)) {
+      return data.map(item => this.serializeCacheData(item));
+    }
+    if (data && typeof data === 'object') {
+      const serialized: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        serialized[key] = this.serializeCacheData(value);
+      }
+      return serialized;
+    }
+    return data;
+  }
+
+  /**
+   * Deserialize data from localStorage (handles BigInt)
+   */
+  private deserializeCacheData(data: any): any {
+    if (data && typeof data === 'object' && data.__type === 'bigint') {
+      return BigInt(data.value);
+    }
+    if (Array.isArray(data)) {
+      return data.map(item => this.deserializeCacheData(item));
+    }
+    if (data && typeof data === 'object') {
+      const deserialized: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        deserialized[key] = this.deserializeCacheData(value);
+      }
+      return deserialized;
+    }
+    return data;
   }
 
   private get contractAddress(): string {
@@ -84,49 +126,68 @@ export class TropicalBlueBonoboToken {
    * Get cached value or null if expired/missing
    */
   private getCached<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    const now = Date.now();
-    if (now - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return entry.data;
+    const cacheKey = this.cachePrefix + key;
+    return getCacheEntry<T>(cacheKey);
   }
 
   /**
    * Set cached value with TTL
    */
   private setCached<T>(key: string, data: T, ttl: number): void {
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl,
-    });
+    try {
+      const cacheKey = this.cachePrefix + key;
+      const entry: SerializableCacheEntry = {
+        data: this.serializeCacheData(data),
+        timestamp: Date.now(),
+        ttl,
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(entry));
+    } catch (error) {
+      // If localStorage is not available or quota exceeded, silently fail
+      console.warn('Failed to set cache:', error);
+    }
   }
 
   /**
    * Clear cache (useful for clearing balance cache after transfers)
    */
   public clearCache(): void {
-    this.cache.clear();
+    try {
+      // Clear all localStorage keys with our prefix
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(this.cachePrefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } catch (error) {
+      console.warn('Failed to clear cache:', error);
+    }
   }
 
   /**
    * Clear balance cache for a specific address
    */
   public clearBalanceCache(address?: string): void {
-    if (address) {
-      this.cache.delete(`balance:${address}`);
-    } else {
-      // Clear all balance entries
-      for (const key of this.cache.keys()) {
-        if (key.startsWith('balance:')) {
-          this.cache.delete(key);
+    try {
+      if (address) {
+        const cacheKey = this.cachePrefix + `balance:${address}`;
+        localStorage.removeItem(cacheKey);
+      } else {
+        // Clear all balance entries
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith(this.cachePrefix + 'balance:')) {
+            keysToRemove.push(key);
+          }
         }
+        keysToRemove.forEach(key => localStorage.removeItem(key));
       }
+    } catch (error) {
+      console.warn('Failed to clear balance cache:', error);
     }
   }
 
@@ -327,7 +388,7 @@ export class TropicalBlueBonoboToken {
       this.clearBalanceCache(sender);
       this.clearBalanceCache(recipient);
       // Also clear total supply cache as it might have changed
-      this.cache.delete('totalSupply');
+      localStorage.removeItem(this.cachePrefix + 'totalSupply');
 
       return {
         txId: response.txid || '',

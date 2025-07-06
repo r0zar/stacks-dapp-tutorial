@@ -10,6 +10,16 @@ path = "src/clarity/token.clar"
 clarity_version = 3
 epoch = 3.0
 
+[contracts.token-batch-transfer]
+path = "src/clarity/token-batch-transfer.clar"
+clarity_version = 3
+epoch = 3.0
+
+[contracts.token-faucet]
+path = "src/clarity/token-faucet.clar"
+clarity_version = 3
+epoch = 3.0
+
 [repl.analysis]
 passes = ["check_checker"]
 check_checker = { trusted_sender = false, trusted_caller = false, callee_filter = false }
