@@ -29,7 +29,7 @@ A comprehensive suite of Clarity smart contracts demonstrating SIP-10 token func
 #### Contract Wrappers (`src/lib/`)
 - **`tropical-blue-bonobo.ts`**: Main token contract wrapper with caching
 - **`tbb-faucet.ts`**: Faucet contract wrapper with mock data simulation
-- **`tbb-batch-transfer.ts`**: Batch transfer utilities and validation
+- **`available-purple-squid.ts`**: Batch transfer utilities and validation
 - **`serializers.ts`**: localStorage serialization with BigInt support
 - **`validators.ts`**: Address and input validation utilities
 
@@ -324,7 +324,7 @@ packages/contracts/
 │   └── lib/                       # TypeScript contract wrappers
 │       ├── tropical-blue-bonobo.ts # Main token wrapper
 │       ├── tbb-faucet.ts          # Faucet wrapper with caching
-│       ├── tbb-batch-transfer.ts  # Batch transfer utilities
+│       ├── available-purple-squid.ts  # Batch transfer utilities
 │       ├── serializers.ts         # localStorage utilities
 │       └── validators.ts          # Input validation
 ├── tests/                         # Contract test suites

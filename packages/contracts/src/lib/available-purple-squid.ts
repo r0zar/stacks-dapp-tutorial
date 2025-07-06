@@ -63,8 +63,8 @@ const CONTRACT_ADDRESSES = {
     testnet: 'ST2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2SYCBMRR',
 } as const;
 
-const TOKEN_CONTRACT_NAME = 'token';
-const BATCH_TRANSFER_CONTRACT_NAME = 'token-batch-transfer';
+const TOKEN_CONTRACT_NAME = 'tropical-blue-bonobo';
+const BATCH_TRANSFER_CONTRACT_NAME = 'available-purple-squid';
 
 type NetworkType = 'mainnet' | 'testnet';
 
@@ -349,14 +349,14 @@ export class TBBBatchTransferContract {
      * Get the explorer URL for the batch transfer contract
      */
     getBatchTransferContractUrl(): string {
-        return `https://explorer.stacks.co/address/${this.getBatchTransferContractId()}?chain=${this.network}`;
+        return `https://explorer.stacks.co/txid/${this.getBatchTransferContractId()}?chain=${this.network}`;
     }
 
     /**
      * Get the explorer URL for the token contract
      */
     getTokenContractUrl(): string {
-        return `https://explorer.stacks.co/address/${this.getTokenContractId()}?chain=${this.network}`;
+        return `https://explorer.stacks.co/txid/${this.getTokenContractId()}?chain=${this.network}`;
     }
 
     /**
@@ -394,6 +394,61 @@ export class TBBBatchTransferContract {
         }
 
         return { success: false, error: 'Invalid contract response' };
+    }
+
+    // CONTRACT DEPLOYMENT CHECKING
+
+    /**
+     * Check if a contract is deployed on the network
+     */
+    async checkContractDeployment(contractId: string): Promise<boolean> {
+        try {
+            const apiUrl = this.network === 'mainnet'
+                ? 'https://api.mainnet.hiro.so'
+                : 'https://api.testnet.hiro.so';
+
+            const response = await fetch(`${apiUrl}/extended/v1/contract/${contractId}`);
+
+            // Return true if contract is found (200), false if not found (404) or other errors
+            return response.status === 200;
+        } catch (error) {
+            console.warn(`Error checking contract ${contractId}:`, error);
+            return false;
+        }
+    }
+
+    /**
+     * Check if the token contract is deployed
+     */
+    async isTokenContractDeployed(): Promise<boolean> {
+        return this.checkContractDeployment(this.getTokenContractId());
+    }
+
+    /**
+     * Check if the batch transfer contract is deployed
+     */
+    async isBatchTransferContractDeployed(): Promise<boolean> {
+        return this.checkContractDeployment(this.getBatchTransferContractId());
+    }
+
+    /**
+     * Check if both contracts required for batch transfers are deployed
+     */
+    async areContractsDeployed(): Promise<{
+        tokenContract: boolean;
+        batchTransferContract: boolean;
+        allDeployed: boolean;
+    }> {
+        const [tokenContract, batchTransferContract] = await Promise.all([
+            this.isTokenContractDeployed(),
+            this.isBatchTransferContractDeployed()
+        ]);
+
+        return {
+            tokenContract,
+            batchTransferContract,
+            allDeployed: tokenContract && batchTransferContract
+        };
     }
 
     // CLARITY CONTRACT INTEGRATION

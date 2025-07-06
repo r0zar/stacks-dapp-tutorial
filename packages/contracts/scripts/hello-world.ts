@@ -10,7 +10,7 @@ const currentTime = new Date().toISOString();
 console.log(`Current time: ${currentTime}`);
 
 // Example importing from the project
-import { CONTRACT_ERRORS } from '../src/lib/tbb-batch-transfer';
+import { CONTRACT_ERRORS } from '../src/lib/available-purple-squid';
 
 console.log('Available contract errors:');
 Object.entries(CONTRACT_ERRORS).forEach(([key, error]) => {

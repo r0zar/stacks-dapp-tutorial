@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Trash2, Upload, Download, Users, SendHorizontal } from 'lucide-react';
+import { Plus, Trash2, Upload, Download, Users, SendHorizontal, CheckCircle, XCircle } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import Input from './ui/Input';
+import ContractStatusIndicator from './ContractStatusIndicator';
 import { useTokenContract } from '../contexts/TokenContractContext';
 import { formatLargeTokenAmount, formatAddress } from '../utils/formatting';
 import {
@@ -18,6 +19,7 @@ interface Recipient {
   address: string;
   amount: number;
   isValid: boolean;
+  validationError?: string;
 }
 
 const BatchTransferForm: React.FC = () => {
@@ -39,6 +41,20 @@ const BatchTransferForm: React.FC = () => {
   const totalAmount = recipients.reduce((sum, r) => sum + (r.amount || 0), 0);
   const validRecipients = recipients.filter(r => r.address && r.amount > 0 && r.isValid);
 
+  // Get batch validation errors for display
+  const getBatchValidationErrors = () => {
+    if (!wallet.address || validRecipients.length === 0) return [];
+    
+    const batchRequest = {
+      recipients: validRecipients.map(r => ({ address: r.address, amount: r.amount })),
+      sender: wallet.address,
+      memo: 'Batch transfer via faucet app'
+    };
+    
+    const validation = batchTransferContract.validateBatchRequest(batchRequest);
+    return validation.errors;
+  };
+
   const addRecipient = () => {
     const newId = (Math.max(...recipients.map(r => parseInt(r.id))) + 1).toString();
     setRecipients([...recipients, { id: newId, address: '', amount: 0, isValid: false }]);
@@ -57,14 +73,34 @@ const BatchTransferForm: React.FC = () => {
     setRecipients(recipients.map(r => {
       if (r.id === id) {
         const updated = { ...r, [field]: value };
-        if (field === 'address') {
-          // Use contract validation
-          const validation = batchTransferContract.validateRecipients([{
-            address: value,
-            amount: r.amount
-          }]);
-          updated.isValid = validation[0]?.isValid || false;
+        // Re-validate the entire recipient when any field changes
+        const finalAmount = field === 'amount' ? value : r.amount;
+        const finalAddress = field === 'address' ? value : r.address;
+        
+        // First check individual recipient validation
+        const recipientValidation = batchTransferContract.validateRecipients([{
+          address: finalAddress,
+          amount: finalAmount || 0
+        }]);
+        
+        let isValid = recipientValidation[0]?.isValid || false;
+        let validationError = recipientValidation[0]?.error;
+        
+        // Also check if sending to self (if we have wallet address)
+        if (isValid && wallet.address && finalAddress) {
+          const batchValidation = batchTransferContract.validateBatchRequest({
+            recipients: [{ address: finalAddress, amount: finalAmount || 0 }],
+            sender: wallet.address,
+            memo: ''
+          });
+          isValid = batchValidation.isValid;
+          if (!isValid && batchValidation.errors.length > 0) {
+            validationError = batchValidation.errors[0]; // Use the first batch validation error
+          }
         }
+        
+        updated.isValid = isValid;
+        updated.validationError = validationError;
         return updated;
       }
       return r;
@@ -72,7 +108,14 @@ const BatchTransferForm: React.FC = () => {
   };
 
   const handleExecuteBatch = async () => {
-    if (!wallet.address) return;
+    console.log('🚀 Execute batch transfer clicked');
+    console.log('Wallet address:', wallet.address);
+    console.log('Valid recipients:', validRecipients);
+    
+    if (!wallet.address) {
+      console.log('❌ No wallet address, returning');
+      return;
+    }
 
     setIsProcessing(true);
     setExecutionResult(null);
@@ -84,14 +127,20 @@ const BatchTransferForm: React.FC = () => {
         amount: r.amount
       }));
 
+      console.log('📋 Contract recipients:', contractRecipients);
+
       const batchRequest: BatchTransferRequest = {
         recipients: contractRecipients,
         sender: wallet.address,
         memo: 'Batch transfer via faucet app'
       };
 
+      console.log('📦 Batch request:', batchRequest);
+
       // Execute batch transfer through contract
+      console.log('🔄 Calling executeBatchTransfer...');
       const result = await batchTransferContract.executeBatchTransfer(batchRequest);
+      console.log('📤 Batch transfer result:', result);
 
       if (result.success) {
         setExecutionResult({
@@ -106,6 +155,7 @@ const BatchTransferForm: React.FC = () => {
         });
       }
     } catch (error) {
+      console.error('❌ Batch transfer error:', error);
       setExecutionResult({
         success: false,
         error: `Transfer failed: ${error}`
@@ -160,12 +210,32 @@ const BatchTransferForm: React.FC = () => {
         }
 
         // Convert contract recipients to UI format
-        const uiRecipients: Recipient[] = parseResult.recipients.map((r, index) => ({
-          id: (index + 1).toString(),
-          address: r.address,
-          amount: r.amount,
-          isValid: batchTransferContract.validateRecipients([r])[0]?.isValid || false
-        }));
+        const uiRecipients: Recipient[] = parseResult.recipients.map((r, index) => {
+          const recipientValidation = batchTransferContract.validateRecipients([r])[0];
+          let isValid = recipientValidation?.isValid || false;
+          let validationError = recipientValidation?.error;
+          
+          // Also check batch validation including sender context
+          if (isValid && wallet.address) {
+            const batchValidation = batchTransferContract.validateBatchRequest({
+              recipients: [r],
+              sender: wallet.address,
+              memo: ''
+            });
+            isValid = batchValidation.isValid;
+            if (!isValid && batchValidation.errors.length > 0) {
+              validationError = batchValidation.errors[0];
+            }
+          }
+          
+          return {
+            id: (index + 1).toString(),
+            address: r.address,
+            amount: r.amount,
+            isValid,
+            validationError
+          };
+        });
 
         setRecipients(uiRecipients);
         setUploadError('');
@@ -351,6 +421,29 @@ const BatchTransferForm: React.FC = () => {
             </table>
           </div>
 
+          {/* Validation Errors */}
+          {(() => {
+            const errors = getBatchValidationErrors();
+            const balanceError = totalAmount > maxAmount ? 'Insufficient balance for this transfer' : null;
+            const allErrors = [...errors, ...(balanceError ? [balanceError] : [])];
+            
+            if (allErrors.length > 0) {
+              return (
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+                  <h4 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+                    Cannot execute transfer:
+                  </h4>
+                  <ul className="text-sm text-red-600 dark:text-red-400 space-y-1">
+                    {allErrors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <div className="flex space-x-4">
             <Button
               variant="outline"
@@ -360,10 +453,17 @@ const BatchTransferForm: React.FC = () => {
               Back to Edit
             </Button>
             <Button
-              onClick={handleExecuteBatch}
+              onClick={() => {
+                console.log('🔘 Button clicked!');
+                console.log('Total amount:', totalAmount);
+                console.log('Max amount:', maxAmount);
+                console.log('Is disabled?', totalAmount > maxAmount);
+                console.log('Validation errors:', getBatchValidationErrors());
+                handleExecuteBatch();
+              }}
               loading={isProcessing}
               className="flex-1"
-              disabled={totalAmount > maxAmount}
+              disabled={totalAmount > maxAmount || getBatchValidationErrors().length > 0}
             >
               {isProcessing ? 'Processing...' : `Execute Batch Transfer`}
             </Button>
@@ -401,24 +501,34 @@ const BatchTransferForm: React.FC = () => {
         </Card>
       ) : (
         <div className="space-y-6">
-          {/* Balance Info */}
-          <Card variant="elevated">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Your Balance</h3>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatLargeTokenAmount(maxAmount)}
-                </p>
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-600 dark:text-gray-400">Total to Send</div>
-                <div className={`text-xl font-bold ${totalAmount > maxAmount ? 'text-red-600' : 'text-gray-900 dark:text-white'
-                  }`}>
-                  {formatLargeTokenAmount(totalAmount)}
+          {/* Contract Status and Balance Info */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Balance Info */}
+            <Card variant="elevated" className="lg:col-span-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Your Balance</h3>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatLargeTokenAmount(maxAmount)}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">Total to Send</div>
+                  <div className={`text-xl font-bold ${totalAmount > maxAmount ? 'text-red-600' : 'text-gray-900 dark:text-white'
+                    }`}>
+                    {formatLargeTokenAmount(totalAmount)}
+                  </div>
                 </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+
+            {/* Contract Status */}
+            <Card variant="elevated">
+              <ContractStatusIndicator
+                batchTransferContract={batchTransferContract}
+              />
+            </Card>
+          </div>
 
           {/* Recipients */}
           <Card variant="elevated">
@@ -476,18 +586,36 @@ const BatchTransferForm: React.FC = () => {
                         placeholder="ST... or SP... address"
                         value={recipient.address}
                         onChange={(e) => updateRecipient(recipient.id, 'address', e.target.value)}
-                        error={recipient.address && !recipient.isValid ? 'Invalid address' : undefined}
                       />
+                      {recipient.address && !recipient.isValid && recipient.validationError && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          {recipient.validationError}
+                        </p>
+                      )}
                     </div>
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      icon={Trash2}
-                      onClick={() => removeRecipient(recipient.id)}
-                      disabled={recipients.length === 1}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    />
+                    {/* Validation Status Indicator */}
+                    <div className="flex items-center space-x-2">
+                      {recipient.address && recipient.amount > 0 && (
+                        recipient.isValid ? (
+                          <CheckCircle 
+                            className="w-5 h-5 text-green-500" 
+                            title="Valid recipient"
+                          />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        )
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={Trash2}
+                        onClick={() => removeRecipient(recipient.id)}
+                        disabled={recipients.length === 1}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex items-center space-x-2">

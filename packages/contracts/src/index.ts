@@ -1,7 +1,7 @@
-export { 
-  TropicalBlueBonoboToken, 
-  tropicalBlueBonoboToken, 
-  tropicalBlueBonoboTokenTestnet 
+export {
+  TropicalBlueBonoboToken,
+  tropicalBlueBonoboToken,
+  tropicalBlueBonoboTokenTestnet
 } from './lib/tropical-blue-bonobo';
 export type { TokenInfo, TokenMetadata, TransferOptions, ContractCallResult } from './lib/tropical-blue-bonobo';
 
@@ -10,12 +10,12 @@ export {
   tbbFaucetContract,
   tbbFaucetContractTestnet
 } from './lib/tbb-faucet';
-export type { 
-  FaucetClaimInfo, 
-  FaucetGlobalStats, 
-  RewardTier, 
-  ClaimResult, 
-  ValidationResult 
+export type {
+  FaucetClaimInfo,
+  FaucetGlobalStats,
+  RewardTier,
+  ClaimResult,
+  ValidationResult
 } from './lib/tbb-faucet';
 
 export {
@@ -23,7 +23,7 @@ export {
   tbbBatchTransferContract,
   tbbBatchTransferContractTestnet,
   CONTRACT_ERRORS
-} from './lib/tbb-batch-transfer';
+} from './lib/available-purple-squid';
 export type {
   BatchTransferRecipient,
   BatchTransferRequest,
@@ -32,4 +32,4 @@ export type {
   RecipientValidation,
   CSVParseResult,
   ContractError
-} from './lib/tbb-batch-transfer';
+} from './lib/available-purple-squid';
