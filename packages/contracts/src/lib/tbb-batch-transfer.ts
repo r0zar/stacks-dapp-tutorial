@@ -1,4 +1,7 @@
 import { isValidStacksAddress } from './validators';
+import { Cl, ClarityValue, Pc } from '@stacks/transactions';
+import { request } from '@stacks/connect';
+import { CallContractParams } from '@stacks/connect/dist/types/methods';
 
 // Type definitions for batch transfer functionality
 export interface BatchTransferRecipient {
@@ -42,6 +45,27 @@ export interface CSVParseResult {
     invalidCount: number;
 }
 
+export interface ContractError {
+    code: number;
+    message: string;
+}
+
+export const CONTRACT_ERRORS = {
+    NOT_ENOUGH_BALANCE: { code: 1, message: 'Insufficient balance' },
+    SENDER_RECIPIENT: { code: 2, message: 'Cannot send to same address' },
+    INVALID_AMOUNT: { code: 3, message: 'Invalid amount (must be > 0)' },
+    NOT_TOKEN_OWNER: { code: 4, message: 'Not authorized to transfer tokens' }
+} as const;
+
+// Contract details by network
+const CONTRACT_ADDRESSES = {
+    mainnet: 'SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS',
+    testnet: 'ST2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2SYCBMRR',
+} as const;
+
+const TOKEN_CONTRACT_NAME = 'token';
+const BATCH_TRANSFER_CONTRACT_NAME = 'token-batch-transfer';
+
 type NetworkType = 'mainnet' | 'testnet';
 
 /**
@@ -59,6 +83,18 @@ export class TBBBatchTransferContract {
 
     constructor(network: NetworkType = 'testnet') {
         this.network = network;
+    }
+
+    private get contractAddress(): string {
+        return CONTRACT_ADDRESSES[this.network];
+    }
+
+    private get fullBatchTransferContractId(): `${string}.${string}` {
+        return `${this.contractAddress}.${BATCH_TRANSFER_CONTRACT_NAME}`;
+    }
+
+    private get fullTokenContractId(): `${string}.${string}` {
+        return `${this.contractAddress}.${TOKEN_CONTRACT_NAME}`;
     }
 
     // READ-ONLY FUNCTIONS (return actual data)
@@ -294,23 +330,157 @@ export class TBBBatchTransferContract {
     getContractInfo() {
         return {
             network: this.network,
-            contractName: 'tbb-batch-transfer',
+            batchTransferContractId: this.getBatchTransferContractId(),
+            tokenContractId: this.getTokenContractId(),
             maxRecipients: this.MAX_RECIPIENTS,
             baseFee: this.BASE_FEE,
             feePerRecipient: this.FEE_PER_RECIPIENT
         };
     }
 
+    /**
+     * Get the explorer URL for a transaction
+     */
+    getTransactionUrl(txId: string): string {
+        return `https://explorer.stacks.co/txid/${txId}?chain=${this.network}`;
+    }
+
+    /**
+     * Get the explorer URL for the batch transfer contract
+     */
+    getBatchTransferContractUrl(): string {
+        return `https://explorer.stacks.co/address/${this.getBatchTransferContractId()}?chain=${this.network}`;
+    }
+
+    /**
+     * Get the explorer URL for the token contract
+     */
+    getTokenContractUrl(): string {
+        return `https://explorer.stacks.co/address/${this.getTokenContractId()}?chain=${this.network}`;
+    }
+
+    /**
+     * Decode contract error from Clarity response
+     */
+    decodeContractError(errorCode: number): ContractError | null {
+        switch (errorCode) {
+            case 1:
+                return CONTRACT_ERRORS.NOT_ENOUGH_BALANCE;
+            case 2:
+                return CONTRACT_ERRORS.SENDER_RECIPIENT;
+            case 3:
+                return CONTRACT_ERRORS.INVALID_AMOUNT;
+            case 4:
+                return CONTRACT_ERRORS.NOT_TOKEN_OWNER;
+            default:
+                return { code: errorCode, message: `Unknown error code: ${errorCode}` };
+        }
+    }
+
+    /**
+     * Parse contract response and extract meaningful error information
+     */
+    parseContractResponse(response: any): { success: boolean; error?: string; errorCode?: number } {
+        if (response.type === 'ok') {
+            return { success: true };
+        } else if (response.type === 'err') {
+            const errorCode = response.value.type === 'uint' ? Number(response.value.value) : 0;
+            const contractError = this.decodeContractError(errorCode);
+            return {
+                success: false,
+                error: contractError?.message || 'Unknown contract error',
+                errorCode
+            };
+        }
+
+        return { success: false, error: 'Invalid contract response' };
+    }
+
+    // CLARITY CONTRACT INTEGRATION
+
+    /**
+     * Create a single recipient tuple in Clarity format
+     */
+    createClarityRecipient(recipient: BatchTransferRecipient, memo?: string): ClarityValue {
+        return Cl.tuple({
+            to: Cl.principal(recipient.address),
+            amount: Cl.uint(recipient.amount),
+            memo: memo ? Cl.some(Cl.bufferFromUtf8(memo)) : Cl.none()
+        });
+    }
+
+    /**
+     * Convert recipients to Clarity list format
+     */
+    createClarityRecipientsList(recipients: BatchTransferRecipient[], memo?: string): ClarityValue {
+        const clarityRecipients = recipients.map(recipient =>
+            this.createClarityRecipient(recipient, memo)
+        );
+
+        return Cl.list(clarityRecipients);
+    }
+
+    /**
+     * Create contract call arguments for send-many function
+     */
+    createContractCallArgs(recipients: BatchTransferRecipient[], memo?: string): ClarityValue[] {
+        return [this.createClarityRecipientsList(recipients, memo)];
+    }
+
+    /**
+     * Get the full contract ID for batch transfers
+     */
+    getBatchTransferContractId(): `${string}.${string}` {
+        return this.fullBatchTransferContractId;
+    }
+
+    /**
+     * Get the full contract ID for the token
+     */
+    getTokenContractId(): `${string}.${string}` {
+        return this.fullTokenContractId;
+    }
+
+    /**
+     * Get the function name for batch transfers
+     */
+    getFunctionName(): string {
+        return 'send-many';
+    }
+
+    /**
+     * Prepare batch transfer for contract call
+     * Returns the data needed to make the actual contract call
+     */
+    prepareBatchTransfer(request: BatchTransferRequest): {
+        contractId: string;
+        functionName: string;
+        functionArgs: ClarityValue[];
+        validation: { isValid: boolean; errors: string[] };
+        summary: BatchTransferSummary;
+    } {
+        const validation = this.validateBatchRequest(request);
+        const summary = this.generateBatchSummary(request.recipients);
+
+        return {
+            contractId: this.getBatchTransferContractId(),
+            functionName: this.getFunctionName(),
+            functionArgs: this.createContractCallArgs(request.recipients, request.memo),
+            validation,
+            summary
+        };
+    }
+
     // PUBLIC FUNCTIONS (return txId only)
 
     /**
-     * Execute batch transfer
+     * Execute batch transfer using Stacks Connect
      * Returns transaction ID only - success/failure determined later
      */
-    async executeBatchTransfer(request: BatchTransferRequest): Promise<BatchTransferResult> {
+    async executeBatchTransfer(requestParams: BatchTransferRequest): Promise<BatchTransferResult> {
         try {
             // Validate request
-            const validation = this.validateBatchRequest(request);
+            const validation = this.validateBatchRequest(requestParams);
             if (!validation.isValid) {
                 return {
                     txId: '',
@@ -319,43 +489,57 @@ export class TBBBatchTransferContract {
                 };
             }
 
-            // Simulate network delay (longer for more recipients)
-            const delay = Math.min(5000, 1000 + (request.recipients.length * 10));
-            await new Promise(resolve => setTimeout(resolve, delay));
+            const { recipients, sender, memo } = requestParams;
 
-            // Generate mock transaction ID
-            const txId = '0x' + Math.random().toString(16).substr(2, 40) + Math.random().toString(16).substr(2, 24);
+            // Build function arguments
+            const functionArgs = this.createContractCallArgs(recipients, memo);
 
-            // Simulate very small chance of failure
-            if (Math.random() < 0.05) { // 5% chance of failure
-                return {
-                    txId: '',
-                    success: false,
-                    error: 'Transaction failed: Network congestion'
-                };
-            }
+            // Calculate total amount for post conditions
+            const totalAmount = this.calculateTotalAmount(recipients);
+
+            // Build post conditions to ensure the sender has enough tokens
+            const postConditions = [
+                Pc.principal(sender)
+                    .willSendEq(totalAmount)
+                    .ft(this.getTokenContractId(), 'TKN')
+            ];
+
+            const params: CallContractParams = {
+                contract: this.getBatchTransferContractId(),
+                functionName: this.getFunctionName(),
+                functionArgs,
+                network: this.network,
+                postConditionMode: 'deny',
+                postConditions,
+            };
+
+            const response = await request('stx_callContract', params);
+
+            console.log('Batch transfer response:', response);
 
             return {
-                txId,
-                success: true
+                txId: response.txid || '',
+                success: true,
             };
 
         } catch (error) {
+            console.error('Batch transfer error:', error);
             return {
                 txId: '',
                 success: false,
-                error: `Batch transfer failed: ${error}`
+                error: `Batch transfer failed: ${error}`,
             };
         }
     }
 
     /**
-     * Simulate individual transfer (for testing)
+     * Execute individual transfer (wrapper around batch transfer)
      */
-    async simulateTransfer(sender: string, recipient: string, amount: number): Promise<BatchTransferResult> {
+    async executeTransfer(sender: string, recipient: string, amount: number, memo?: string): Promise<BatchTransferResult> {
         return this.executeBatchTransfer({
             recipients: [{ address: recipient, amount }],
-            sender
+            sender,
+            memo
         });
     }
 }

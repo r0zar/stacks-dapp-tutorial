@@ -30,7 +30,8 @@
     "check-types": "tsc --noEmit",
     "test": "vitest run",
     "test:report": "vitest run -- --coverage --costs",
-    "test:watch": "chokidar \"tests/**/*.ts\" \"contracts/**/*.clar\" -c \"npm run test:report\""
+    "test:watch": "chokidar \"tests/**/*.ts\" \"contracts/**/*.clar\" -c \"npm run test:report\"",
+    "execute": "./execute.sh"
   },
   "author": "",
   "license": "ISC",
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "bunchee": "^6.5.4",
-    "eslint": "^9.30.0"
+    "eslint": "^9.30.0",
+    "tsx": "^4.19.2"
   }
 }

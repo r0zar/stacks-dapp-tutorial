@@ -89,7 +89,7 @@ importers:
         version: 8.35.1(eslint@9.30.1)(typescript@5.8.3)
       vite:
         specifier: ^6.3.5
-        version: 6.3.5
+        version: 6.3.5(tsx@4.20.3)
 
   apps/my-token:
     dependencies:
@@ -162,7 +162,7 @@ importers:
         version: 8.35.1(eslint@9.30.1)(typescript@5.8.3)
       vite:
         specifier: ^6.3.5
-        version: 6.3.5
+        version: 6.3.5(tsx@4.20.3)
 
   apps/native:
     dependencies:
@@ -235,10 +235,10 @@ importers:
         version: 5.8.3
       vite:
         specifier: ^6.1.0
-        version: 6.3.5
+        version: 6.3.5(tsx@4.20.3)
       vitest:
         specifier: ^3.0.0
-        version: 3.2.4
+        version: 3.2.4(tsx@4.20.3)
       vitest-environment-clarinet:
         specifier: ^2.3.0
         version: 2.3.0(@hirosystems/clarinet-sdk@3.2.0)(vitest@3.2.4)
@@ -249,6 +249,9 @@ importers:
       eslint:
         specifier: ^9.30.0
         version: 9.30.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.20.3
 
   packages/typescript-config: {}
 
@@ -3680,7 +3683,7 @@ packages:
       '@tailwindcss/node': 4.1.11
       '@tailwindcss/oxide': 4.1.11
       tailwindcss: 4.1.11
-      vite: 6.3.5
+      vite: 6.3.5(tsx@4.20.3)
     dev: false
 
   /@tanstack/react-virtual@3.13.12(react-dom@19.1.0)(react@19.1.0):
@@ -4135,7 +4138,7 @@ packages:
       '@rolldown/pluginutils': 1.0.0-beta.19
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.3.5
+      vite: 6.3.5(tsx@4.20.3)
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -4164,7 +4167,7 @@ packages:
       '@vitest/spy': 3.2.4
       estree-walker: 3.0.3
       magic-string: 0.30.17
-      vite: 6.3.5
+      vite: 6.3.5(tsx@4.20.3)
     dev: false
 
   /@vitest/pretty-format@3.2.4:
@@ -6723,7 +6726,6 @@ packages:
     resolution: {integrity: sha512-auHyJ4AgMz7vgS8Hp3N6HXSmlMdUyhSUrfBF16w153rxtLIEOE+HGqaBppczZvnHLqQJfiHotCYpNhl0lUROFQ==}
     dependencies:
       resolve-pkg-maps: 1.0.0
-    dev: true
 
   /getenv@1.0.0:
     resolution: {integrity: sha512-7yetJWqbS9sbn0vIfliPsFgoXMKn/YMF+Wuiog97x+urnSRRRZ7xB+uVkwGKzRgq9CDFfMQnE9ruL5DHv9c6Xg==}
@@ -9642,7 +9644,6 @@ packages:
 
   /resolve-pkg-maps@1.0.0:
     resolution: {integrity: sha512-seS2Tj26TBVOC2NIc2rOe2y2ZO7efxITtLZcGSOnHHNOQ7CkiUBfw0Iw2ck6xkIhPwLhKNLS8BO+hEpngQlqzw==}
-    dev: true
 
   /resolve-workspace-root@2.0.0:
     resolution: {integrity: sha512-IsaBUZETJD5WsI11Wt8PKHwaIe45or6pwNc8yflvLJ4DWtImK9kuLoH5kUva/2Mmx/RdIyr4aONNSa2v9LTJsw==}
@@ -10596,6 +10597,16 @@ packages:
   /tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
 
+  /tsx@4.20.3:
+    resolution: {integrity: sha512-qjbnuR9Tr+FJOMBqJCW5ehvIo/buZq7vH7qD7JziU98h6l3qGy0a/yPFjwO+y0/T7GFpNgNAvEcPPVfyT8rrPQ==}
+    engines: {node: '>=18.0.0'}
+    hasBin: true
+    dependencies:
+      esbuild: 0.25.5
+      get-tsconfig: 4.10.1
+    optionalDependencies:
+      fsevents: 2.3.3
+
   /turbo-darwin-64@2.5.0:
     resolution: {integrity: sha512-fP1hhI9zY8hv0idym3hAaXdPi80TLovmGmgZFocVAykFtOxF+GlfIgM/l4iLAV9ObIO4SUXPVWHeBZQQ+Hpjag==}
     cpu: [x64]
@@ -10869,7 +10880,7 @@ packages:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
-  /vite-node@3.2.4:
+  /vite-node@3.2.4(tsx@4.20.3):
     resolution: {integrity: sha512-EbKSKh+bh1E1IFxeO0pg1n4dvoOTt0UDiXMd/qn++r98+jPO1xtJilvXldeuQ8giIB5IkpjCgMleHMNEsGH6pg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
@@ -10878,7 +10889,7 @@ packages:
       debug: 4.4.1
       es-module-lexer: 1.7.0
       pathe: 2.0.3
-      vite: 6.3.5
+      vite: 6.3.5(tsx@4.20.3)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -10894,7 +10905,7 @@ packages:
       - yaml
     dev: false
 
-  /vite@6.3.5:
+  /vite@6.3.5(tsx@4.20.3):
     resolution: {integrity: sha512-cZn6NDFE7wdTpINgs++ZJ4N49W2vRp8LCKrn3Ob1kYNtOo21vfDoaV5GzBfLU4MovSAB8uNRm4jgzVQZ+mBzPQ==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
@@ -10940,6 +10951,7 @@ packages:
       postcss: 8.5.6
       rollup: 4.44.2
       tinyglobby: 0.2.14
+      tsx: 4.20.3
     optionalDependencies:
       fsevents: 2.3.3
 
@@ -10950,10 +10962,10 @@ packages:
       vitest: ^1.0.0 || ^2.0.0 || ^3.0.0
     dependencies:
       '@hirosystems/clarinet-sdk': 3.2.0
-      vitest: 3.2.4
+      vitest: 3.2.4(tsx@4.20.3)
     dev: false
 
-  /vitest@3.2.4:
+  /vitest@3.2.4(tsx@4.20.3):
     resolution: {integrity: sha512-LUCP5ev3GURDysTWiP47wRRUpLKMOfPh+yKTx3kVIEiu5KOMeqzpnYNsKyOoVrULivR8tLcks4+lga33Whn90A==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
@@ -11001,8 +11013,8 @@ packages:
       tinyglobby: 0.2.14
       tinypool: 1.1.1
       tinyrainbow: 2.0.0
-      vite: 6.3.5
-      vite-node: 3.2.4
+      vite: 6.3.5(tsx@4.20.3)
+      vite-node: 3.2.4(tsx@4.20.3)
       why-is-node-running: 2.3.0
     transitivePeerDependencies:
       - jiti

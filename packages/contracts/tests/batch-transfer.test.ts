@@ -104,7 +104,7 @@ describe('Batch Transfer Contract Tests', () => {
     simnet.callPublicFn('token-batch-transfer', 'send-many', [setupTransfer], simnet.deployer);
 
     // Check deployer balance is now very low
-    const deployerBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(simnet.deployer)], simnet.deployer);
+    simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(simnet.deployer)], simnet.deployer);
 
     // Now create a batch where first transfer fails, second would succeed if reached
     const failingBatch = Cl.list([

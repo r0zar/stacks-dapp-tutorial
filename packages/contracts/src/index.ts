@@ -21,7 +21,8 @@ export type {
 export {
   TBBBatchTransferContract,
   tbbBatchTransferContract,
-  tbbBatchTransferContractTestnet
+  tbbBatchTransferContractTestnet,
+  CONTRACT_ERRORS
 } from './lib/tbb-batch-transfer';
 export type {
   BatchTransferRecipient,
@@ -29,5 +30,6 @@ export type {
   BatchTransferResult,
   BatchTransferSummary,
   RecipientValidation,
-  CSVParseResult
+  CSVParseResult,
+  ContractError
 } from './lib/tbb-batch-transfer';
