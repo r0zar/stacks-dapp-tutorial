@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Send, ArrowRight, CheckCircle, AlertCircle, Wallet } from 'lucide-react';
+import { Send, ArrowRight, CheckCircle, AlertCircle, Wallet, ExternalLink } from 'lucide-react';
 import Card from './ui/Card';
 import Input from './ui/Input';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
-import { useMockWallet } from '../hooks/useMockWallet';
-import { simulateApiDelay } from '../utils/mockData';
+import { useTokenContract } from '../contexts/TokenContractContext';
 import { formatTokenAmount, formatAddress, isValidStacksAddress, formatFeeAmount } from '../utils/formatting';
 
 interface TransferData {
@@ -22,7 +21,7 @@ interface TransferStatus {
 }
 
 const TransferForm: React.FC = () => {
-  const { wallet, connect, isConnecting } = useMockWallet();
+  const { wallet, transfer, connect, isConnecting, getExplorerUrl } = useTokenContract();
   const [formData, setFormData] = useState<TransferData>({
     recipient: '',
     amount: 0,
@@ -32,8 +31,8 @@ const TransferForm: React.FC = () => {
   const [transferStatus, setTransferStatus] = useState<TransferStatus>({ status: 'idle' });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  const estimatedFee = 0.002; // STX
-  const maxAmount = wallet.balance;
+  const estimatedFee = 0.0003; // STX
+  const maxAmount = Number(wallet.balance);
 
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -49,107 +48,82 @@ const TransferForm: React.FC = () => {
     if (!formData.amount || formData.amount <= 0) {
       newErrors.amount = 'Amount must be greater than 0';
     } else if (formData.amount > maxAmount) {
-      newErrors.amount = 'Insufficient balance';
+      newErrors.amount = `Amount exceeds balance (${formatTokenAmount(maxAmount, 'TKN')})`;
+    }
+
+    if (formData.memo.length > 34) {
+      newErrors.memo = 'Memo must be 34 characters or less';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleInputChange = (field: keyof TransferData, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!wallet.connected) {
+      connect();
+      return;
+    }
+
     if (!validateForm()) return;
+
     setShowConfirmModal(true);
   };
 
-  const handleConfirmTransfer = async () => {
+  const executeTransfer = async () => {
     setShowConfirmModal(false);
     setTransferStatus({ status: 'confirming' });
 
     try {
-      await simulateApiDelay(1000);
-      setTransferStatus({ status: 'pending' });
-      
-      await simulateApiDelay(2000);
-      
-      const txId = `0x${Math.random().toString(16).substring(2, 66)}`;
-      setTransferStatus({ status: 'success', txId });
-      
-      // Reset form
-      setFormData({ recipient: '', amount: 0, memo: '' });
-      
+      const result = await transfer({
+        amount: formData.amount,
+        recipient: formData.recipient,
+        memo: formData.memo || undefined,
+      });
+
+      if (result.success) {
+        setTransferStatus({
+          status: 'success',
+          txId: result.txId,
+        });
+        // Reset form
+        setFormData({ recipient: '', amount: 0, memo: '' });
+      } else {
+        setTransferStatus({
+          status: 'error',
+          error: result.error || 'Transfer failed',
+        });
+      }
     } catch (error) {
-      setTransferStatus({ 
-        status: 'error', 
-        error: 'Transfer failed. Please try again.' 
+      setTransferStatus({
+        status: 'error',
+        error: `Transfer failed: ${error}`,
       });
     }
   };
 
-  const handleAmountChange = (value: string) => {
-    const numValue = parseFloat(value) || 0;
-    setFormData(prev => ({ ...prev, amount: numValue }));
-  };
-
-  const setMaxAmount = () => {
-    setFormData(prev => ({ ...prev, amount: maxAmount }));
-  };
-
-  const resetTransfer = () => {
+  const resetTransferStatus = () => {
     setTransferStatus({ status: 'idle' });
   };
 
-  if (!wallet.connected) {
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <Card variant="elevated" className="text-center">
-          <Wallet className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Connect Your Wallet</h3>
-          <p className="text-gray-600 dark:text-gray-300 mb-6">
-            Please connect your wallet to transfer tokens
-          </p>
-          <Button 
-            variant="primary" 
-            onClick={connect}
-            loading={isConnecting}
-            icon={Wallet}
-          >
-            Connect Wallet
-          </Button>
-        </Card>
-      </div>
-    );
-  }
+  const handleViewOnExplorer = () => {
+    const explorerUrl = getExplorerUrl();
+    window.open(explorerUrl, '_blank');
+  };
 
-  if (transferStatus.status === 'success') {
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <Card variant="elevated" className="text-center">
-            <CheckCircle className="w-16 h-16 mx-auto mb-4 text-green-500" />
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Transfer Successful!</h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Your tokens have been sent successfully
-            </p>
-            
-            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Transaction ID</p>
-              <p className="font-mono text-sm text-gray-900 dark:text-gray-100 break-all">
-                {transferStatus.txId}
-              </p>
-            </div>
-            
-            <Button onClick={resetTransfer} variant="primary">
-              Send Another Transfer
-            </Button>
-          </Card>
-        </motion.div>
-      </div>
-    );
-  }
+  const handleMaxClick = () => {
+    handleInputChange('amount', maxAmount);
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-12">
@@ -160,126 +134,132 @@ const TransferForm: React.FC = () => {
       >
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Transfer Tokens</h2>
         <p className="text-gray-600 dark:text-gray-300">
-          Send TKN tokens to any Stacks address quickly and securely
+          Send tokens to any Stacks address instantly and securely.
         </p>
       </motion.div>
 
-      <Card variant="elevated">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Wallet Info */}
-          <div className="bg-primary-50 dark:bg-primary-900/20 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Your Balance</p>
-                <p className="text-lg font-semibold text-primary-600">
-                  {formatTokenAmount(wallet.balance, 'TKN', { compact: true })}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-600 dark:text-gray-400">Address</p>
-                <p className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                  {formatAddress(wallet.address!)}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recipient */}
-          <Input
-            label="Recipient Address"
-            placeholder="Enter Stacks address (SP... or ST...)"
-            value={formData.recipient}
-            onChange={(e) => setFormData(prev => ({ ...prev, recipient: e.target.value }))}
-            error={errors.recipient}
-            required
-          />
-
-          {/* Amount */}
-          <div className="space-y-2">
-            <Input
-              label="Amount"
-              type="number"
-              placeholder="0.00"
-              value={formData.amount === 0 ? '' : formData.amount.toString()}
-              onChange={(e) => handleAmountChange(e.target.value)}
-              error={errors.amount}
-              required
-              min="0"
-              max={maxAmount}
-              step="1"
-            />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">
-                Available: {formatTokenAmount(maxAmount, 'TKN', { compact: true })}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={setMaxAmount}
-              >
-                Max
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Card variant="elevated">
+          {!wallet.connected ? (
+            <div className="text-center py-12">
+              <Wallet className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-600" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Connect Your Wallet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Connect your Stacks wallet to start transferring tokens.
+              </p>
+              <Button onClick={connect} loading={isConnecting} size="lg">
+                Connect Wallet
               </Button>
             </div>
-          </div>
-
-          {/* Memo */}
-          <Input
-            label="Memo (Optional)"
-            placeholder="Add a note for this transfer"
-            value={formData.memo}
-            onChange={(e) => setFormData(prev => ({ ...prev, memo: e.target.value }))}
-            helperText="Optional message to include with the transfer"
-          />
-
-          {/* Transaction Summary */}
-          {formData.amount > 0 && formData.recipient && !errors.recipient && !errors.amount && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-3"
-            >
-              <h4 className="font-semibold text-gray-900 dark:text-white">Transaction Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Amount</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{formatTokenAmount(formData.amount, 'TKN')}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">Network Fee</span>
-                  <span className="font-medium text-gray-900 dark:text-white">{formatFeeAmount(estimatedFee)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600 dark:text-gray-400">To</span>
-                  <span className="font-medium font-mono text-gray-900 dark:text-white">{formatAddress(formData.recipient)}</span>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Wallet Info */}
+              <div className="p-4 bg-gradient-to-r from-primary-50 to-secondary-50 dark:from-primary-900/20 dark:to-secondary-900/20 rounded-lg border border-primary-200 dark:border-primary-700">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Your Balance</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {formatTokenAmount(maxAmount, 'TKN')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Connected as</p>
+                    <p className="text-sm font-mono text-gray-900 dark:text-white">
+                      {formatAddress(wallet.address!)}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </motion.div>
-          )}
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            fullWidth
-            variant="primary"
-            size="lg"
-            icon={Send}
-            disabled={transferStatus.status === 'confirming' || transferStatus.status === 'pending'}
-            loading={transferStatus.status === 'confirming' || transferStatus.status === 'pending'}
-          >
-            {transferStatus.status === 'confirming' && 'Confirming Transfer...'}
-            {transferStatus.status === 'pending' && 'Transfer Pending...'}
-            {transferStatus.status === 'idle' && 'Send Transfer'}
-          </Button>
+              {/* Recipient */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Recipient Address
+                </label>
+                <Input
+                  placeholder="SP... or ST..."
+                  value={formData.recipient}
+                  onChange={(e) => handleInputChange('recipient', e.target.value)}
+                  error={errors.recipient}
+                  disabled={transferStatus.status !== 'idle'}
+                />
+              </div>
 
-          {transferStatus.status === 'error' && (
-            <div className="flex items-center p-3 bg-red-50 border border-red-200 rounded-lg">
-              <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
-              <p className="text-sm text-red-700">{transferStatus.error}</p>
-            </div>
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Amount (TKN)
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    placeholder="0.00"
+                    value={formData.amount || ''}
+                    onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
+                    error={errors.amount}
+                    disabled={transferStatus.status !== 'idle'}
+                    min="0"
+                    step="0.000001"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleMaxClick}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary-600 hover:text-primary-700 text-sm font-medium disabled:opacity-50"
+                    disabled={transferStatus.status !== 'idle'}
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              {/* Memo */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Memo (optional)
+                </label>
+                <Input
+                  placeholder="Optional transaction memo"
+                  value={formData.memo}
+                  onChange={(e) => handleInputChange('memo', e.target.value)}
+                  error={errors.memo}
+                  disabled={transferStatus.status !== 'idle'}
+                  maxLength={34}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {formData.memo.length}/34 characters
+                </p>
+              </div>
+
+              {/* Fee Estimation */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Estimated Fee</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    {formatFeeAmount(estimatedFee)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                fullWidth
+                size="lg"
+                disabled={transferStatus.status !== 'idle'}
+                loading={transferStatus.status === 'confirming'}
+              >
+                {transferStatus.status === 'confirming' ? 'Confirming...' : 'Send Tokens'}
+              </Button>
+            </form>
           )}
-        </form>
-      </Card>
+        </Card>
+      </motion.div>
 
       {/* Confirmation Modal */}
       <Modal
@@ -288,57 +268,108 @@ const TransferForm: React.FC = () => {
         title="Confirm Transfer"
       >
         <div className="space-y-4">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <ArrowRight className="w-8 h-8 text-primary-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Confirm Token Transfer
-            </h3>
-            <p className="text-gray-600">
-              Please review the details before confirming
-            </p>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-3">
             <div className="flex justify-between">
-              <span className="text-gray-600">Amount</span>
-              <span className="font-semibold">{formatTokenAmount(formData.amount, 'TKN')}</span>
+              <span className="text-gray-600 dark:text-gray-400">To</span>
+              <span className="font-mono text-sm text-gray-900 dark:text-white">{formatAddress(formData.recipient)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">To</span>
-              <span className="font-mono text-sm">{formatAddress(formData.recipient)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Network Fee</span>
-              <span className="font-semibold">{formatFeeAmount(estimatedFee)}</span>
+              <span className="text-gray-600 dark:text-gray-400">Amount</span>
+              <span className="font-semibold text-gray-900 dark:text-white">{formatTokenAmount(formData.amount, 'TKN')}</span>
             </div>
             {formData.memo && (
               <div className="flex justify-between">
-                <span className="text-gray-600">Memo</span>
-                <span className="font-medium">{formData.memo}</span>
+                <span className="text-gray-600 dark:text-gray-400">Memo</span>
+                <span className="text-sm text-gray-900 dark:text-white">{formData.memo}</span>
               </div>
             )}
+            <div className="flex justify-between border-t border-gray-200 dark:border-gray-600 pt-3">
+              <span className="text-gray-600 dark:text-gray-400">Network Fee</span>
+              <span className="text-sm text-gray-900 dark:text-white">{formatFeeAmount(estimatedFee)}</span>
+            </div>
           </div>
 
           <div className="flex space-x-3">
             <Button
               variant="outline"
-              fullWidth
               onClick={() => setShowConfirmModal(false)}
+              fullWidth
             >
               Cancel
             </Button>
             <Button
-              variant="primary"
+              onClick={executeTransfer}
               fullWidth
-              onClick={handleConfirmTransfer}
             >
               Confirm Transfer
             </Button>
           </div>
         </div>
       </Modal>
+
+      {/* Status Modal */}
+      {transferStatus.status !== 'idle' && (
+        <Modal
+          isOpen={true}
+          onClose={resetTransferStatus}
+          title={
+            transferStatus.status === 'success' ? 'Transfer Successful' :
+              transferStatus.status === 'error' ? 'Transfer Failed' :
+                'Processing Transfer'
+          }
+        >
+          <div className="text-center py-6">
+            {transferStatus.status === 'success' && (
+              <>
+                <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  Your transfer has been submitted successfully!
+                </p>
+                {transferStatus.txId && (
+                  <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Transaction ID</p>
+                      <button
+                        onClick={handleViewOnExplorer}
+                        className="flex items-center space-x-1 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                        title="View Contract on Explorer"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        <span className="text-xs">Contract</span>
+                      </button>
+                    </div>
+                    <p className="font-mono text-xs break-all text-gray-900 dark:text-white">{transferStatus.txId}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {transferStatus.status === 'error' && (
+              <>
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  {transferStatus.error}
+                </p>
+              </>
+            )}
+
+            {transferStatus.status === 'confirming' && (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4">
+                  <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600"></div>
+                </div>
+                <p className="text-gray-600 dark:text-gray-300">
+                  Please confirm the transaction in your wallet...
+                </p>
+              </>
+            )}
+          </div>
+
+          <Button onClick={resetTransferStatus} fullWidth>
+            Close
+          </Button>
+        </Modal>
+      )}
     </div>
   );
 };

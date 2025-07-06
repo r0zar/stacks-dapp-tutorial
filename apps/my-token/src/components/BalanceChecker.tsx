@@ -4,16 +4,52 @@ import { Search, Copy, Clock, Star } from 'lucide-react';
 import Card from './ui/Card';
 import Input from './ui/Input';
 import Button from './ui/Button';
-import { mockPopularAddresses, getMockBalance, simulateApiDelay } from '../utils/mockData';
+import { useTokenContract } from '../contexts/TokenContractContext';
 import { formatTokenAmount, formatAddress, isValidStacksAddress, copyToClipboard } from '../utils/formatting';
 
 interface BalanceResult {
   address: string;
-  balance: number;
+  balance: bigint;
   timestamp: Date;
 }
 
+// Network-specific example addresses
+const getExampleAddresses = (network: 'mainnet' | 'testnet') => {
+  if (network === 'mainnet') {
+    return [
+      {
+        label: 'Contract Deployer',
+        address: 'SP2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2T0Z55KS',
+      },
+      {
+        label: 'Example Address 1',
+        address: 'SP1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      },
+      {
+        label: 'Example Address 2',
+        address: 'SP1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5',
+      },
+    ];
+  } else {
+    return [
+      {
+        label: 'Contract Deployer',
+        address: 'ST2ZNGJ85ENDY6QRHQ5P2D4FXKGZWCKTB2SYCBMRR',
+      },
+      {
+        label: 'Example Address 1',
+        address: 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM',
+      },
+      {
+        label: 'Example Address 2', 
+        address: 'ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5',
+      },
+    ];
+  }
+};
+
 const BalanceChecker: React.FC = () => {
+  const { getBalance, wallet } = useTokenContract();
   const [searchAddress, setSearchAddress] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [recentSearches, setRecentSearches] = useState<BalanceResult[]>([]);
@@ -35,9 +71,7 @@ const BalanceChecker: React.FC = () => {
     setError('');
 
     try {
-      await simulateApiDelay(800);
-      
-      const balance = getMockBalance(searchAddress);
+      const balance = await getBalance(searchAddress);
       const result: BalanceResult = {
         address: searchAddress,
         balance,
@@ -54,6 +88,7 @@ const BalanceChecker: React.FC = () => {
 
     } catch (err) {
       setError('Failed to fetch balance. Please try again.');
+      console.error('Balance check error:', err);
     } finally {
       setIsSearching(false);
     }
@@ -67,7 +102,6 @@ const BalanceChecker: React.FC = () => {
   const handleCopyAddress = async (address: string) => {
     const success = await copyToClipboard(address);
     if (success) {
-      // Could show a toast notification here
       console.log('Address copied to clipboard');
     }
   };
@@ -87,7 +121,8 @@ const BalanceChecker: React.FC = () => {
       >
         <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Balance Checker</h2>
         <p className="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-          Check the token balance for any Stacks address instantly. Enter an address below or select from popular addresses.
+          Check the token balance for any Stacks address on <span className="font-semibold text-primary-600 dark:text-primary-400">{wallet.network === 'mainnet' ? 'Mainnet' : 'Testnet'}</span>. 
+          Enter an address below or select from example addresses.
         </p>
       </motion.div>
 
@@ -103,7 +138,7 @@ const BalanceChecker: React.FC = () => {
             <div className="space-y-6">
               <div className="flex gap-3">
                 <Input
-                  placeholder="Enter Stacks address (SP... or ST...)"
+                  placeholder={`Enter ${wallet.network === 'mainnet' ? 'Mainnet' : 'Testnet'} address (${wallet.network === 'mainnet' ? 'SP...' : 'ST...'})`}
                   value={searchAddress}
                   onChange={(e) => setSearchAddress(e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -149,7 +184,7 @@ const BalanceChecker: React.FC = () => {
                     <div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Balance</p>
                       <p className="text-2xl font-bold text-primary-600">
-                        {formatTokenAmount(currentResult.balance, 'TKN', { compact: true })}
+                        {formatTokenAmount(Number(currentResult.balance), 'TKN', { compact: true })}
                       </p>
                     </div>
                     <div>
@@ -166,10 +201,10 @@ const BalanceChecker: React.FC = () => {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <Star className="w-5 h-5 mr-2 text-yellow-500" />
-                  Popular Addresses
+                  Example Addresses ({wallet.network === 'mainnet' ? 'Mainnet' : 'Testnet'})
                 </h3>
                 <div className="space-y-2">
-                  {mockPopularAddresses.map((item, index) => (
+                  {getExampleAddresses(wallet.network).map((item, index) => (
                     <motion.div
                       key={item.address}
                       initial={{ opacity: 0, y: 10 }}
@@ -185,8 +220,8 @@ const BalanceChecker: React.FC = () => {
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-primary-600">
-                          {formatTokenAmount(item.balance, 'TKN', { compact: true })}
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Click to check
                         </p>
                       </div>
                     </motion.div>
@@ -238,7 +273,7 @@ const BalanceChecker: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-semibold text-primary-600">
-                        {formatTokenAmount(result.balance, 'TKN', { compact: true })}
+                        {formatTokenAmount(Number(result.balance), 'TKN', { compact: true })}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {result.timestamp.toLocaleTimeString()}

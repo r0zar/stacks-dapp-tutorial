@@ -6,14 +6,16 @@ import BalanceChecker from './components/BalanceChecker';
 import TransferForm from './components/TransferForm';
 import Button from './components/ui/Button';
 import { useDarkMode } from './hooks/useDarkMode';
+import { TokenContractProvider, useTokenContract } from './contexts/TokenContractContext';
 import './index.css';
 
 type Page = 'home' | 'balance' | 'transfer' | 'stats';
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isDark, toggle: toggleDarkMode } = useDarkMode();
+  const { tokenInfo, wallet, switchNetwork } = useTokenContract();
 
   const navigation = [
     { id: 'home', label: 'Home', icon: Home, component: Hero },
@@ -21,7 +23,17 @@ const App: React.FC = () => {
     { id: 'transfer', label: 'Transfer', icon: Send, component: TransferForm },
   ];
 
-  const CurrentComponent = navigation.find(nav => nav.id === currentPage)?.component || Hero;
+  const renderCurrentComponent = () => {
+    const nav = navigation.find(nav => nav.id === currentPage);
+    if (!nav) return <Hero onNavigate={handlePageChange} />;
+
+    if (nav.id === 'home') {
+      return <Hero onNavigate={handlePageChange} />;
+    }
+
+    const Component = nav.component;
+    return <Component />;
+  };
 
   const handlePageChange = (page: Page) => {
     setCurrentPage(page);
@@ -36,10 +48,20 @@ const App: React.FC = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">T</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-lg flex items-center justify-center overflow-hidden">
+                {tokenInfo?.tokenUri?.image ? (
+                  <img
+                    src={tokenInfo.tokenUri.image}
+                    alt={`${tokenInfo.name} token`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-bold text-sm">T</span>
+                )}
               </div>
-              <span className="font-bold text-xl text-gray-900 dark:text-white">Token</span>
+              <span className="font-bold text-xl text-gray-900 dark:text-white">
+                {tokenInfo?.name || 'Token'}
+              </span>
             </div>
 
             {/* Desktop Navigation */}
@@ -62,6 +84,30 @@ const App: React.FC = () => {
                   </button>
                 );
               })}
+
+              {/* Network Switcher */}
+              <div className="flex items-center space-x-1 ml-4">
+                <button
+                  onClick={() => switchNetwork('testnet')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                    wallet.network === 'testnet'
+                      ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Testnet
+                </button>
+                <button
+                  onClick={() => switchNetwork('mainnet')}
+                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                    wallet.network === 'mainnet'
+                      ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  }`}
+                >
+                  Mainnet
+                </button>
+              </div>
 
               {/* Dark Mode Toggle */}
               <Button
@@ -116,6 +162,33 @@ const App: React.FC = () => {
                   );
                 })}
 
+                {/* Mobile Network Switcher */}
+                <div className="px-4 py-3">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Network</p>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => switchNetwork('testnet')}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
+                        wallet.network === 'testnet'
+                          ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Testnet
+                    </button>
+                    <button
+                      onClick={() => switchNetwork('mainnet')}
+                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg transition-all duration-200 ${
+                        wallet.network === 'mainnet'
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      Mainnet
+                    </button>
+                  </div>
+                </div>
+
                 {/* Mobile Dark Mode Toggle */}
                 <Button
                   variant="ghost"
@@ -141,7 +214,7 @@ const App: React.FC = () => {
         transition={{ duration: 0.3 }}
         className="relative flex-1 flex flex-col"
       >
-        <CurrentComponent />
+        {renderCurrentComponent()}
       </motion.main>
 
       {/* Footer */}
@@ -149,10 +222,20 @@ const App: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-3 mb-4 md:mb-0">
-              <div className="w-6 h-6 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-md flex items-center justify-center">
-                <span className="text-white font-bold text-xs">T</span>
+              <div className="w-6 h-6 bg-gradient-to-br from-primary-600 to-secondary-600 rounded-md flex items-center justify-center overflow-hidden">
+                {tokenInfo?.tokenUri?.image ? (
+                  <img
+                    src={tokenInfo.tokenUri.image}
+                    alt={`${tokenInfo.name} token`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-bold text-xs">T</span>
+                )}
               </div>
-              <span className="font-semibold text-gray-900 dark:text-white">Token (TKN)</span>
+              <span className="font-semibold text-gray-900 dark:text-white">
+                {tokenInfo?.name || 'Token'} ({tokenInfo?.symbol || 'TKN'})
+              </span>
             </div>
 
             <div className="flex items-center space-x-6 text-sm text-gray-600 dark:text-gray-400">
@@ -165,11 +248,19 @@ const App: React.FC = () => {
           </div>
 
           <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700 text-center text-sm text-gray-500 dark:text-gray-400">
-            <p>This is a demonstration interface for a SIP-10 token. All interactions are simulated.</p>
+            <p>This is a demonstration interface for a SIP-10 token.</p>
           </div>
         </div>
       </footer>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <TokenContractProvider>
+      <AppContent />
+    </TokenContractProvider>
   );
 };
 
