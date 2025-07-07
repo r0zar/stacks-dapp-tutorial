@@ -154,8 +154,8 @@ const Hero: React.FC = () => {
       color: 'text-cyan-600'
     },
     {
-      label: 'Daily Target',
-      value: faucetStats ? formatLargeTokenAmount(faucetStats.dailyTarget) : (isLoadingFaucetStats ? '...' : 'Loading'),
+      label: 'Avg Emission Rate',
+      value: faucetStats ? `${formatLargeTokenAmount(faucetStats.dailyRate)}/day` : (isLoadingFaucetStats ? '...' : 'Loading'),
       icon: Target,
       color: 'text-emerald-600'
     },
@@ -377,7 +377,7 @@ const Hero: React.FC = () => {
                       <Droplets className="w-6 h-6 text-gray-400" />
                     </div>
                     <p className="text-gray-500 dark:text-gray-400">
-                      {isLoadingFaucetStats ? 'Loading faucet analytics...' : 'Faucet analytics unavailable'}
+                      {isLoadingFaucetStats ? 'Loading faucet analytics...' : 'Unable to load faucet data'}
                     </p>
                   </div>
                 )}

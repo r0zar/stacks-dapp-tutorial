@@ -4,9 +4,16 @@ import {
   tropicalBlueBonoboToken,
   tropicalBlueBonoboTokenTestnet,
   TropicalBlueBonoboToken,
+  tbbFaucetContract,
+  tbbFaucetContractTestnet,
+  TBBFaucetContract,
   type TokenInfo,
   type TransferOptions,
-  type ContractCallResult
+  type ContractCallResult,
+  type FaucetClaimInfo,
+  type FaucetGlobalStats,
+  type RewardTier,
+  type ClaimResult
 } from 'contracts';
 
 export interface WalletState {
@@ -17,9 +24,19 @@ export interface WalletState {
   isLoading: boolean;
 }
 
+export interface FaucetState {
+  claimInfo: FaucetClaimInfo | null;
+  globalStats: FaucetGlobalStats | null;
+  rewardTiers: RewardTier[];
+  isLoading: boolean;
+  lastClaimedAmount: number;
+  lastTxId: string | undefined;
+}
+
 export interface TokenContractContextType {
   wallet: WalletState;
   tokenInfo: TokenInfo | null;
+  faucet: FaucetState;
   isConnecting: boolean;
   connect: () => void;
   disconnect: () => void;
@@ -27,8 +44,12 @@ export interface TokenContractContextType {
   transfer: (options: Omit<TransferOptions, 'sender'>) => Promise<ContractCallResult>;
   refreshBalance: () => Promise<void>;
   refreshTokenInfo: () => Promise<void>;
+  refreshFaucetData: (forceRefresh?: boolean, explicitNetwork?: 'mainnet' | 'testnet') => Promise<void>;
+  claimTokens: () => Promise<ClaimResult>;
+  depositTokens: (amount: number) => Promise<ClaimResult>;
   getExplorerUrl: () => string;
   switchNetwork: (network: 'mainnet' | 'testnet') => void;
+  getFaucetContract: () => TBBFaucetContract;
 }
 
 const TokenContractContext = createContext<TokenContractContextType | undefined>(undefined);
@@ -75,9 +96,22 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
 
-  // Get the appropriate contract instance based on network
+  const [faucet, setFaucet] = useState<FaucetState>({
+    claimInfo: null,
+    globalStats: null,
+    rewardTiers: [],
+    isLoading: false,
+    lastClaimedAmount: 0,
+    lastTxId: undefined,
+  });
+
+  // Get the appropriate contract instances based on network
   const getContract = useCallback((): TropicalBlueBonoboToken => {
     return wallet.network === 'mainnet' ? tropicalBlueBonoboToken : tropicalBlueBonoboTokenTestnet;
+  }, [wallet.network]);
+
+  const getFaucetContract = useCallback((): TBBFaucetContract => {
+    return wallet.network === 'mainnet' ? tbbFaucetContract : tbbFaucetContractTestnet;
   }, [wallet.network]);
 
   // Initialize wallet state from existing connection
@@ -169,6 +203,23 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
     }
   }, [wallet.connected, wallet.address, wallet.network]);
 
+  // Load faucet data when wallet connects or network changes
+  useEffect(() => {
+    if (wallet.connected && wallet.address) {
+      refreshFaucetData(false);
+    } else {
+      // Reset faucet data when wallet disconnects
+      setFaucet({
+        claimInfo: null,
+        globalStats: null,
+        rewardTiers: [],
+        isLoading: false,
+        lastClaimedAmount: 0,
+        lastTxId: undefined,
+      });
+    }
+  }, [wallet.connected, wallet.address, wallet.network, tokenInfo]);
+
   const connectWallet = async () => {
     setIsConnecting(true);
 
@@ -257,6 +308,123 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
     }
   };
 
+  const refreshFaucetData = async (forceRefresh: boolean = false, explicitNetwork?: 'mainnet' | 'testnet'): Promise<void> => {
+    if (!wallet.address) return;
+
+    // Use explicit network if provided, otherwise fall back to wallet state
+    const targetNetwork = explicitNetwork || wallet.network;
+
+    console.log('🔄 [TokenContractContext] refreshFaucetData called with wallet.address:', wallet.address);
+    console.log('🔄 [TokenContractContext] Force refresh:', forceRefresh);
+    console.log('🔄 [TokenContractContext] Target network:', targetNetwork);
+
+    setFaucet(prev => ({ ...prev, isLoading: true }));
+
+    try {
+      // Get the correct contract for the target network (not dependent on wallet state)
+      const faucetContract = targetNetwork === 'mainnet' ? tbbFaucetContract : tbbFaucetContractTestnet;
+      console.log('🏭 [TokenContractContext] Using faucet contract for network:', targetNetwork);
+
+      // Clear caches if force refresh is requested
+      if (forceRefresh) {
+        console.log('🗑️ [TokenContractContext] Clearing all caches...');
+        faucetContract.clearCache();
+        faucetContract.refreshAnalytics();
+      }
+
+      const [userClaimInfo, stats, tiers] = await Promise.all([
+        faucetContract.getClaimInfo(wallet.address),
+        faucetContract.getGlobalStats(),
+        faucetContract.getRewardTiers()
+      ]);
+
+      console.log('🏭 [TokenContractContext] Stats:', stats);
+
+      console.log('📊 [TokenContractContext] Received claim info:', userClaimInfo);
+
+      setFaucet(prev => ({
+        ...prev,
+        claimInfo: userClaimInfo,
+        globalStats: stats,
+        rewardTiers: tiers,
+        isLoading: false,
+      }));
+    } catch (error) {
+      console.error('Failed to load faucet data:', error);
+      setFaucet(prev => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const claimTokens = async (): Promise<ClaimResult> => {
+    if (!wallet.address) {
+      return {
+        txId: '',
+        success: false,
+        error: 'Wallet not connected',
+      };
+    }
+
+    try {
+      const faucetContract = getFaucetContract();
+      const result = await faucetContract.claimTokens(wallet.address);
+
+      if (result.success) {
+        // Update faucet state with claim results
+        const currentReward = faucet.claimInfo ? faucetContract.getCurrentReward(faucet.claimInfo.streakCount) : 0;
+        setFaucet(prev => ({
+          ...prev,
+          lastClaimedAmount: currentReward,
+          lastTxId: result.txId,
+        }));
+
+        // Refresh data to reflect new state
+        setTimeout(() => {
+          refreshFaucetData();
+          refreshBalance(); // Also refresh user balance
+        }, 1000);
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        txId: '',
+        success: false,
+        error: `Claim failed: ${error}`,
+      };
+    }
+  };
+
+  const depositTokens = async (amount: number): Promise<ClaimResult> => {
+    if (!wallet.address) {
+      return {
+        txId: '',
+        success: false,
+        error: 'Wallet not connected',
+      };
+    }
+
+    try {
+      const faucetContract = getFaucetContract();
+      const result = await faucetContract.depositTokens(wallet.address, amount);
+
+      if (result.success) {
+        // Refresh data to reflect new balances
+        setTimeout(() => {
+          refreshFaucetData();
+          refreshBalance(); // Also refresh user balance
+        }, 1000);
+      }
+
+      return result;
+    } catch (error) {
+      return {
+        txId: '',
+        success: false,
+        error: `Deposit failed: ${error}`,
+      };
+    }
+  };
+
   const transfer = async (options: Omit<TransferOptions, 'sender'>): Promise<ContractCallResult> => {
     if (!wallet.address) {
       return {
@@ -298,17 +466,40 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
   const switchNetwork = (network: 'mainnet' | 'testnet') => {
     // Save to localStorage
     setStoredNetwork(network);
-    
+
     setWallet(prev => ({
       ...prev,
       network,
       // Clear balance when switching networks as it may be different
       balance: 0n,
     }));
-    
-    // Clear token info cache when switching networks
+
+    // Clear token info and faucet data cache when switching networks
     setTokenInfo(null);
+    setFaucet({
+      claimInfo: null,
+      globalStats: null,
+      rewardTiers: [],
+      isLoading: false,
+      lastClaimedAmount: 0,
+      lastTxId: undefined,
+    });
+
+    // Clear contract caches for both networks to prevent cross-contamination
+    try {
+      tbbFaucetContract.clearCache();
+      tbbFaucetContract.refreshAnalytics();
+    } catch (error) {
+      console.warn('Failed to clear mainnet faucet cache:', error);
+    }
     
+    try {
+      tbbFaucetContractTestnet.clearCache(); 
+      tbbFaucetContractTestnet.refreshAnalytics();
+    } catch (error) {
+      console.warn('Failed to clear testnet faucet cache:', error);
+    }
+
     // Reload token info for the new network
     const loadTokenInfo = async () => {
       try {
@@ -320,16 +511,19 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
       }
     };
     loadTokenInfo();
-    
-    // Refresh balance if connected
+
+    // Refresh balance and faucet data if connected
     if (wallet.connected && wallet.address) {
       setTimeout(async () => {
         try {
           const contract = network === 'mainnet' ? tropicalBlueBonoboToken : tropicalBlueBonoboTokenTestnet;
           const balance = await contract.getBalance(wallet.address!);
           setWallet(prev => ({ ...prev, balance }));
+
+          // Also refresh faucet data for new network (pass explicit network to avoid race condition)
+          refreshFaucetData(false, network);
         } catch (error) {
-          console.error('Failed to refresh balance for new network:', error);
+          console.error('Failed to refresh data for new network:', error);
         }
       }, 100);
     }
@@ -338,6 +532,7 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
   const value: TokenContractContextType = {
     wallet,
     tokenInfo,
+    faucet,
     isConnecting,
     connect: connectWallet,
     disconnect: disconnectWallet,
@@ -345,8 +540,12 @@ export const TokenContractProvider: React.FC<TokenContractProviderProps> = ({ ch
     transfer,
     refreshBalance,
     refreshTokenInfo,
+    refreshFaucetData,
+    claimTokens,
+    depositTokens,
     getExplorerUrl,
     switchNetwork,
+    getFaucetContract,
   };
 
   return (

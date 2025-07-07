@@ -134,14 +134,19 @@ const FaucetSuccessModal: React.FC<FaucetSuccessModalProps> = ({
           <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border border-orange-200 dark:border-orange-700">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <Zap className="w-5 h-5 text-orange-600" />
-              <span className="font-semibold text-orange-800 dark:text-orange-200">Current Streak</span>
+              <span className="font-semibold text-orange-800 dark:text-orange-200">Streak Status</span>
             </div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-              🔥 {currentStreak} days
+              {currentStreak > 0 ? `🔥 ${currentStreak} days` : '🚀 Start your streak!'}
             </div>
+            {currentStreak === 0 && (
+              <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                First claim starts your streak
+              </div>
+            )}
             {currentStreak === 1 && (
               <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                Streak started!
+                First claim completed!
               </div>
             )}
             {currentStreak > 1 && (

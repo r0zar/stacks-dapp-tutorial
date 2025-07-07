@@ -1,92 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Droplets, Clock, TrendingUp, Users, Zap } from 'lucide-react';
+import { Droplets, Clock, TrendingUp, Users, Zap, Plus, RefreshCw } from 'lucide-react';
 import Button from './ui/Button';
 import Card from './ui/Card';
 import FaucetSuccessModal from './FaucetSuccessModal';
+import FaucetContractStatusIndicator from './FaucetContractStatusIndicator';
+import DepositTokensModal from './DepositTokensModal';
 import { useTokenContract } from '../contexts/TokenContractContext';
 import { formatLargeTokenAmount, formatCountdown, formatDepletionEstimate, formatAddress } from '../utils/formatting';
-import {
-  tbbFaucetContract,
-  tbbFaucetContractTestnet,
-  type FaucetClaimInfo,
-  type FaucetGlobalStats,
-  type RewardTier
-} from 'contracts';
 
 // Removed mock data - now using contract wrapper
 
 const FaucetClaim: React.FC = () => {
-  const { wallet, tokenInfo, connect, isConnecting, getExplorerUrl } = useTokenContract();
-
-  // Contract instance
-  const faucetContract = wallet.network === 'mainnet' ? tbbFaucetContract : tbbFaucetContractTestnet;
-
-  // State from contract
-  const [claimInfo, setClaimInfo] = useState<FaucetClaimInfo | null>(null);
-  const [globalStats, setGlobalStats] = useState<FaucetGlobalStats | null>(null);
-  const [rewardTiers, setRewardTiers] = useState<RewardTier[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
+  const {
+    wallet,
+    tokenInfo,
+    faucet,
+    connect,
+    isConnecting,
+    claimTokens,
+    depositTokens,
+    getFaucetContract,
+    refreshFaucetData
+  } = useTokenContract();
 
   // UI state
   const [isClaiming, setIsClaiming] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastClaimedAmount, setLastClaimedAmount] = useState(0);
-  const [lastTxId, setLastTxId] = useState<string>();
   const [claimError, setClaimError] = useState<string>('');
+  const [timeRemaining, setTimeRemaining] = useState(0);
 
-  // Load data from contract
-  const loadFaucetData = async () => {
-    if (!wallet.address) return;
+  // Deposit state
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [isDepositing, setIsDepositing] = useState(false);
 
-    setIsLoadingData(true);
-    try {
-      const [userClaimInfo, stats, tiers] = await Promise.all([
-        faucetContract.getClaimInfo(wallet.address),
-        faucetContract.getGlobalStats(),
-        faucetContract.getRewardTiers()
-      ]);
+  // Get faucet contract instance
+  const faucetContract = getFaucetContract();
 
-      setClaimInfo(userClaimInfo);
-      setGlobalStats(stats);
-      setRewardTiers(tiers);
-    } catch (error) {
-      console.error('Failed to load faucet data:', error);
-    } finally {
-      setIsLoadingData(false);
-    }
-  };
+  // Derived values from context faucet state
+  const currentReward = faucet.claimInfo ? faucetContract.getCurrentReward(faucet.claimInfo.streakCount) : 0;
+  const nextReward = faucet.claimInfo ? faucetContract.getNextRewardAmount(faucet.claimInfo.streakCount) : 0;
+  const remaining = faucet.globalStats ? faucet.globalStats.remaining : 0;
+  const percentageRemaining = faucet.globalStats ? faucet.globalStats.percentageRemaining : 0;
 
-  // Load data when wallet connects or network changes
+  // Initialize time remaining from claim info
   useEffect(() => {
-    if (wallet.connected && wallet.address) {
-      loadFaucetData();
+    if (faucet.claimInfo) {
+      setTimeRemaining(faucet.claimInfo.timeUntilNextClaim);
     }
-  }, [wallet.connected, wallet.address, wallet.network]);
+  }, [faucet.claimInfo?.timeUntilNextClaim]);
 
-  // Derived values
-  const currentReward = claimInfo ? faucetContract.getCurrentReward(claimInfo.streakCount) : 0;
-  const nextReward = claimInfo ? faucetContract.getNextRewardAmount(claimInfo.streakCount) : 0;
-  const remaining = globalStats ? globalStats.remaining : 0;
-  const percentageRemaining = globalStats ? globalStats.percentageRemaining : 0;
-
-  // Countdown timer for next claim
+  // Real-time countdown timer
   useEffect(() => {
-    if (claimInfo && !claimInfo.canClaimNow && claimInfo.timeUntilNextClaim > 0) {
+    if (timeRemaining > 0) {
       const timer = setInterval(() => {
-        setClaimInfo(prev => {
-          if (!prev) return prev;
-          const newTimeUntilNext = Math.max(0, prev.timeUntilNextClaim - 1);
-          return {
-            ...prev,
-            timeUntilNextClaim: newTimeUntilNext,
-            canClaimNow: newTimeUntilNext === 0
-          };
+        setTimeRemaining(prev => {
+          const newTime = Math.max(0, prev - 1);
+          // When countdown reaches zero, refresh faucet data to update claim availability
+          if (newTime === 0 && prev > 0) {
+            setTimeout(() => refreshFaucetData(), 100);
+          }
+          return newTime;
         });
       }, 1000);
+
       return () => clearInterval(timer);
     }
-  }, [claimInfo?.canClaimNow, claimInfo?.timeUntilNextClaim]);
+  }, [timeRemaining, refreshFaucetData]);
 
   const handleClaim = async () => {
     if (!wallet.connected) {
@@ -94,7 +74,7 @@ const FaucetClaim: React.FC = () => {
       return;
     }
 
-    if (!wallet.address || !claimInfo) {
+    if (!wallet.address || !faucet.claimInfo) {
       return;
     }
 
@@ -102,15 +82,11 @@ const FaucetClaim: React.FC = () => {
     setClaimError('');
 
     try {
-      const result = await faucetContract.claimTokens(wallet.address);
+      const result = await claimTokens();
 
       if (result.success) {
-        setLastClaimedAmount(currentReward);
-        setLastTxId(result.txId);
         setShowSuccessModal(true);
-
-        // Reload faucet data to reflect new state
-        await loadFaucetData();
+        // The context already handles updating the state and refreshing data
       } else {
         setClaimError(result.error || 'Claim failed');
       }
@@ -121,14 +97,38 @@ const FaucetClaim: React.FC = () => {
     }
   };
 
+  const handleDeposit = async (amount: number) => {
+    if (!wallet.address) {
+      throw new Error('Wallet not connected');
+    }
+
+    setIsDepositing(true);
+    setClaimError('');
+
+    try {
+      const result = await depositTokens(amount);
+
+      if (result.success) {
+        // The context already handles updating the state and refreshing data
+      } else {
+        throw new Error(result.error || 'Deposit failed');
+      }
+    } catch (error) {
+      setClaimError(`Deposit failed: ${error}`);
+      throw error;
+    } finally {
+      setIsDepositing(false);
+    }
+  };
+
   const handleViewOnExplorer = () => {
-    const explorerUrl = getExplorerUrl();
+    const explorerUrl = faucet.lastTxId ? `https://explorer.stacks.co/txid/${faucet.lastTxId}?chain=${wallet.network}` : faucetContract.getTokenContractUrl();
     window.open(explorerUrl, '_blank');
   };
 
   const getCurrentTierIndex = (): number => {
-    if (!claimInfo) return 0;
-    return faucetContract.getTierIndex(claimInfo.streakCount);
+    if (!faucet.claimInfo) return 0;
+    return faucetContract.getTierIndex(faucet.claimInfo.streakCount);
   };
 
   return (
@@ -155,10 +155,10 @@ const FaucetClaim: React.FC = () => {
             </p>
 
             {/* Urgency Banner */}
-            {globalStats && (
+            {faucet.globalStats && (
               <div className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-medium">
                 <Zap className="w-4 h-4" />
-                <span>Faucet depletes in {formatDepletionEstimate(globalStats.estimatedDaysRemaining)} • Claim now!</span>
+                <span>Faucet depletes in {formatDepletionEstimate(faucet.globalStats.estimatedDaysRemaining)} • Claim now!</span>
               </div>
             )}
           </motion.div>
@@ -175,12 +175,12 @@ const FaucetClaim: React.FC = () => {
               <Card variant="elevated" className="text-center">
 
                 {/* Current Streak Display */}
-                {claimInfo && (
+                {!faucet.isLoading && faucet.claimInfo && faucet.claimInfo.streakCount > 0 && (
                   <div className="mb-8">
                     <div className="flex items-center justify-center space-x-2 mb-3">
                       <div className="text-2xl">🔥</div>
                       <span className="text-lg font-semibold text-gray-700 dark:text-gray-300">
-                        Day {claimInfo.streakCount} Streak!
+                        Day {faucet.claimInfo.streakCount} Streak!
                       </span>
                     </div>
                   </div>
@@ -197,10 +197,10 @@ const FaucetClaim: React.FC = () => {
                 </div>
 
                 {/* Countdown or Claim Button */}
-                {claimInfo && !claimInfo.canClaimNow ? (
+                {faucet.claimInfo && timeRemaining > 0 ? (
                   <div className="mb-8">
                     <div className="text-3xl font-mono font-bold text-orange-600 dark:text-orange-400 mb-2">
-                      {formatCountdown(claimInfo.timeUntilNextClaim)}
+                      {formatCountdown(timeRemaining)}
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 flex items-center justify-center space-x-2">
                       <Clock className="w-4 h-4" />
@@ -236,7 +236,7 @@ const FaucetClaim: React.FC = () => {
                   <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                     Reward Progression
                   </h3>
-                  {rewardTiers.map((tier, index) => {
+                  {faucet.rewardTiers.map((tier, index) => {
                     const isCurrentTier = index === getCurrentTierIndex();
                     const isCompleted = index < getCurrentTierIndex();
 
@@ -279,43 +279,68 @@ const FaucetClaim: React.FC = () => {
               className="space-y-6"
             >
 
+              {/* Contract Status */}
+              <Card variant="elevated">
+                <FaucetContractStatusIndicator
+                  faucetContract={faucetContract}
+                />
+              </Card>
+
               {/* Personal Stats */}
               <Card variant="elevated">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
-                  <Users className="w-5 h-5" />
-                  <span>Your Stats</span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                    <Users className="w-5 h-5" />
+                    <span>Your Stats</span>
+                  </h3>
+                  <button
+                    onClick={() => refreshFaucetData(true)}
+                    className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+                    title="Refresh analytics data"
+                  >
+                    <RefreshCw className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  </button>
+                </div>
                 <div className="space-y-4">
-                  {claimInfo ? (
+                  {faucet.isLoading ? (
+                    <div className="space-y-4">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="flex justify-between">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-24"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : faucet.claimInfo ? (
                     <>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Claimed</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatLargeTokenAmount(claimInfo.totalClaimed)}
+                          {faucet.claimInfo.totalClaimed > 0 ? formatLargeTokenAmount(faucet.claimInfo.totalClaimed) : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Current Streak</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {claimInfo.streakCount} days
+                          {faucet.claimInfo.streakCount > 0 ? `${faucet.claimInfo.streakCount} days` : 'No streak yet'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Total Claims</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {claimInfo.totalClaims}
+                          {faucet.claimInfo.totalClaims > 0 ? faucet.claimInfo.totalClaims : '—'}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Next Tier In</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {claimInfo.streakCount >= 15 ? 'Max tier!' :
-                            `${Math.max(0, (claimInfo.streakCount >= 8 ? 15 : claimInfo.streakCount >= 4 ? 8 : 4) - claimInfo.streakCount)} days`}
+                          {faucet.claimInfo.streakCount >= 15 ? 'Max tier!' :
+                            faucet.claimInfo.streakCount === 0 ? 'Start claiming!' :
+                              `${Math.max(0, (faucet.claimInfo.streakCount >= 8 ? 15 : faucet.claimInfo.streakCount >= 4 ? 8 : 4) - faucet.claimInfo.streakCount)} days`}
                         </span>
                       </div>
+
                     </>
-                  ) : isLoadingData ? (
-                    <div className="text-center text-gray-500 dark:text-gray-400">Loading...</div>
                   ) : (
                     <div className="text-center text-gray-500 dark:text-gray-400">Connect wallet to view stats</div>
                   )}
@@ -333,12 +358,25 @@ const FaucetClaim: React.FC = () => {
 
               {/* Global Faucet Stats */}
               <Card variant="elevated">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center space-x-2">
-                  <TrendingUp className="w-5 h-5" />
-                  <span>Faucet Status</span>
-                </h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center space-x-2">
+                    <TrendingUp className="w-5 h-5" />
+                    <span>Faucet Status</span>
+                  </h3>
+                  {wallet.connected && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowDepositModal(true)}
+                      className="text-green-600 border-green-300 hover:bg-green-50 dark:text-green-400 dark:border-green-600 dark:hover:bg-green-900/20"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Deposit
+                    </Button>
+                  )}
+                </div>
                 <div className="space-y-4">
-                  {globalStats ? (
+                  {faucet.globalStats ? (
                     <>
                       <div>
                         <div className="flex justify-between mb-2">
@@ -359,16 +397,16 @@ const FaucetClaim: React.FC = () => {
                       </div>
 
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Daily Target</span>
+                        <span className="text-gray-600 dark:text-gray-400">Avg Emission Rate</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatLargeTokenAmount(globalStats.dailyTarget)}
+                          {formatLargeTokenAmount(faucet.globalStats.dailyRate)}/day
                         </span>
                       </div>
 
                       <div className="flex justify-between">
                         <span className="text-gray-600 dark:text-gray-400">Est. Depletion</span>
                         <span className="font-semibold text-orange-600 dark:text-orange-400">
-                          {formatDepletionEstimate(globalStats.estimatedDaysRemaining)}
+                          {formatDepletionEstimate(faucet.globalStats.estimatedDaysRemaining)}
                         </span>
                       </div>
                     </>
@@ -378,15 +416,15 @@ const FaucetClaim: React.FC = () => {
                 </div>
               </Card>
 
-              {/* Achievement Badge */}
-              {claimInfo && claimInfo.streakCount > 0 && (
+              {/* Achievement Badge - Only show for real streaks */}
+              {!faucet.isLoading && faucet.claimInfo && faucet.claimInfo.streakCount > 2 && (
                 <Card variant="elevated" className="text-center bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-700">
                   <div className="text-3xl mb-2">🏆</div>
                   <h4 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
                     Hot Streak!
                   </h4>
                   <p className="text-sm text-yellow-600 dark:text-yellow-300">
-                    {claimInfo.streakCount} consecutive days
+                    {faucet.claimInfo.streakCount} consecutive days
                   </p>
                 </Card>
               )}
@@ -400,14 +438,27 @@ const FaucetClaim: React.FC = () => {
       <FaucetSuccessModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
-        claimedAmount={lastClaimedAmount}
-        currentStreak={claimInfo?.streakCount || 0}
+        claimedAmount={faucet.lastClaimedAmount}
+        currentStreak={faucet.claimInfo?.streakCount || 0}
         nextRewardAmount={nextReward}
-        timeUntilNextClaim={claimInfo?.timeUntilNextClaim || 0}
-        txId={lastTxId}
+        timeUntilNextClaim={faucet.claimInfo?.timeUntilNextClaim || 0}
+        txId={faucet.lastTxId}
         onViewExplorer={handleViewOnExplorer}
         tokenImage={tokenInfo?.tokenUri?.image}
         tokenSymbol={tokenInfo?.symbol}
+      />
+
+      {/* Deposit Modal */}
+      <DepositTokensModal
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
+        onDeposit={handleDeposit}
+        isDepositing={isDepositing}
+        tokenSymbol={tokenInfo?.symbol}
+        userBalance={wallet.balance}
+        faucetBalance={faucet.globalStats?.remaining || 0}
+        totalSupply={faucet.globalStats?.totalSupply || 0}
+        isLoadingBalance={wallet.isLoading}
       />
 
       {/* Error Display */}

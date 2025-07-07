@@ -245,27 +245,7 @@ export class TropicalBlueBonoboToken {
    * Get the total supply of tokens
    */
   async getTotalSupply(): Promise<bigint> {
-    const cacheKey = 'totalSupply';
-    const cached = this.getCached<bigint>(cacheKey);
-    if (cached !== null) return cached;
-
-    try {
-      const result = await fetchCallReadOnlyFunction({
-        contractAddress: this.contractAddress,
-        contractName: this.contractName,
-        functionName: 'get-total-supply',
-        functionArgs: [],
-        network: this.network as any,
-        senderAddress: this.contractAddress,
-      });
-
-      const jsonResult = cvToJSON(result);
-      const totalSupply = BigInt(jsonResult.value.value);
-      this.setCached(cacheKey, totalSupply, this.DYNAMIC_DATA_TTL);
-      return totalSupply;
-    } catch (error) {
-      throw new Error(`Failed to get total supply: ${error}`);
-    }
+    return 10_000_000_000n;
   }
 
   /**

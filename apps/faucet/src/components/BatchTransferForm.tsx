@@ -44,13 +44,13 @@ const BatchTransferForm: React.FC = () => {
   // Get batch validation errors for display
   const getBatchValidationErrors = () => {
     if (!wallet.address || validRecipients.length === 0) return [];
-    
+
     const batchRequest = {
       recipients: validRecipients.map(r => ({ address: r.address, amount: r.amount })),
       sender: wallet.address,
       memo: 'Batch transfer via faucet app'
     };
-    
+
     const validation = batchTransferContract.validateBatchRequest(batchRequest);
     return validation.errors;
   };
@@ -76,16 +76,16 @@ const BatchTransferForm: React.FC = () => {
         // Re-validate the entire recipient when any field changes
         const finalAmount = field === 'amount' ? value : r.amount;
         const finalAddress = field === 'address' ? value : r.address;
-        
+
         // First check individual recipient validation
         const recipientValidation = batchTransferContract.validateRecipients([{
           address: finalAddress,
           amount: finalAmount || 0
         }]);
-        
+
         let isValid = recipientValidation[0]?.isValid || false;
         let validationError = recipientValidation[0]?.error;
-        
+
         // Also check if sending to self (if we have wallet address)
         if (isValid && wallet.address && finalAddress) {
           const batchValidation = batchTransferContract.validateBatchRequest({
@@ -98,7 +98,7 @@ const BatchTransferForm: React.FC = () => {
             validationError = batchValidation.errors[0]; // Use the first batch validation error
           }
         }
-        
+
         updated.isValid = isValid;
         updated.validationError = validationError;
         return updated;
@@ -111,7 +111,7 @@ const BatchTransferForm: React.FC = () => {
     console.log('🚀 Execute batch transfer clicked');
     console.log('Wallet address:', wallet.address);
     console.log('Valid recipients:', validRecipients);
-    
+
     if (!wallet.address) {
       console.log('❌ No wallet address, returning');
       return;
@@ -214,7 +214,7 @@ const BatchTransferForm: React.FC = () => {
           const recipientValidation = batchTransferContract.validateRecipients([r])[0];
           let isValid = recipientValidation?.isValid || false;
           let validationError = recipientValidation?.error;
-          
+
           // Also check batch validation including sender context
           if (isValid && wallet.address) {
             const batchValidation = batchTransferContract.validateBatchRequest({
@@ -227,7 +227,7 @@ const BatchTransferForm: React.FC = () => {
               validationError = batchValidation.errors[0];
             }
           }
-          
+
           return {
             id: (index + 1).toString(),
             address: r.address,
@@ -426,7 +426,7 @@ const BatchTransferForm: React.FC = () => {
             const errors = getBatchValidationErrors();
             const balanceError = totalAmount > maxAmount ? 'Insufficient balance for this transfer' : null;
             const allErrors = [...errors, ...(balanceError ? [balanceError] : [])];
-            
+
             if (allErrors.length > 0) {
               return (
                 <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
@@ -474,7 +474,7 @@ const BatchTransferForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
+    <div className="max-w-6xl w-full mx-auto px-6 py-12">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -598,15 +598,14 @@ const BatchTransferForm: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       {recipient.address && recipient.amount > 0 && (
                         recipient.isValid ? (
-                          <CheckCircle 
-                            className="w-5 h-5 text-green-500" 
-                            title="Valid recipient"
+                          <CheckCircle
+                            className="w-5 h-5 text-green-500"
                           />
                         ) : (
                           <XCircle className="w-5 h-5 text-red-500" />
                         )
                       )}
-                      
+
                       <Button
                         variant="ghost"
                         size="sm"

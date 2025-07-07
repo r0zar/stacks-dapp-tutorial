@@ -9,14 +9,14 @@ export {
   TBBFaucetContract,
   tbbFaucetContract,
   tbbFaucetContractTestnet
-} from './lib/tbb-faucet';
+} from './lib/spare-tomato-pelican';
 export type {
   FaucetClaimInfo,
   FaucetGlobalStats,
   RewardTier,
   ClaimResult,
   ValidationResult
-} from './lib/tbb-faucet';
+} from './lib/spare-tomato-pelican';
 
 export {
   TBBBatchTransferContract,
