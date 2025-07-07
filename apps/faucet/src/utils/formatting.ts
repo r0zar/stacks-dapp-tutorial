@@ -44,10 +44,7 @@ export const formatTokenAmount = (
 export const formatLargeTokenAmount = (
   amount: number,
   symbol: string = 'TKN',
-  options: { showFullOnHover?: boolean } = {}
 ): string => {
-  const { showFullOnHover = false } = options;
-  
   if (amount >= 1_000_000_000) {
     const billions = (amount / 1_000_000_000).toFixed(1);
     return `${billions}B ${symbol}`;
@@ -58,18 +55,18 @@ export const formatLargeTokenAmount = (
     const thousands = (amount / 1_000).toFixed(1);
     return `${thousands}K ${symbol}`;
   }
-  
+
   return `${amount.toLocaleString()} ${symbol}`;
 };
 
 // Format countdown timer
 export const formatCountdown = (totalSeconds: number): string => {
   if (totalSeconds <= 0) return "00:00:00";
-  
+
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  
+
   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
@@ -93,13 +90,13 @@ export const formatAddress = (
   if (!address) {
     return '';
   }
-  
+
   const { start = 6, end = 4 } = options;
-  
+
   if (address.length <= start + end) {
     return address;
   }
-  
+
   return `${address.slice(0, start)}...${address.slice(-end)}`;
 };
 
@@ -181,27 +178,27 @@ export const isValidStacksAddress = (address: string): boolean => {
   if (!address || typeof address !== 'string') {
     return false;
   }
-  
+
   // Check length (typically 40-41 characters, but allow some flexibility)
   if (address.length < 38 || address.length > 42) {
     return false;
   }
-  
+
   // Check prefix
   if (!address.startsWith('SP') && !address.startsWith('ST')) {
     return false;
   }
-  
+
   // Stacks addresses actually use a modified base58 that includes 0-9, A-Z, a-z
   // but excludes O, I, l to avoid confusion (but includes 0)
   const stacksAddressRegex = /^[0-9A-HJ-NP-Za-kmp-z]+$/;
   const addressWithoutPrefix = address.slice(2);
-  
+
   // Additional check: ensure the address is not too short after prefix removal
   if (addressWithoutPrefix.length < 36) {
     return false;
   }
-  
+
   return stacksAddressRegex.test(addressWithoutPrefix);
 };
 

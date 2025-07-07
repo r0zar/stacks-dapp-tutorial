@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Plus, AlertCircle, ExternalLink } from 'lucide-react';
+import { X, Plus, AlertCircle } from 'lucide-react';
 import Button from './ui/Button';
 import { formatLargeTokenAmount } from '../utils/formatting';
 
@@ -37,7 +37,7 @@ const DepositTokensModal: React.FC<DepositTokensModalProps> = ({
 
   const handleDeposit = async () => {
     const depositAmount = parseFloat(amount);
-    
+
     if (!depositAmount || depositAmount <= 0) {
       setError('Please enter a valid amount greater than 0');
       return;
@@ -45,7 +45,7 @@ const DepositTokensModal: React.FC<DepositTokensModalProps> = ({
 
     const userBalanceNumber = Number(userBalance);
     console.log('Deposit validation - Amount:', depositAmount, 'User Balance:', userBalanceNumber, 'Raw Balance:', userBalance);
-    
+
     if (depositAmount > userBalanceNumber) {
       setError('Insufficient balance');
       return;
@@ -214,7 +214,7 @@ const DepositTokensModal: React.FC<DepositTokensModalProps> = ({
               {/* Info Note */}
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-3">
                 <p className="text-xs text-blue-600 dark:text-blue-400">
-                  <strong>Note:</strong> Deposited tokens will be available for other users to claim from the faucet. 
+                  <strong>Note:</strong> Deposited tokens will be available for other users to claim from the faucet.
                   This action cannot be undone.
                 </p>
               </div>

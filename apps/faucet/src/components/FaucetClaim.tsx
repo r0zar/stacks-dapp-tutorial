@@ -146,7 +146,7 @@ const FaucetClaim: React.FC = () => {
                     ⚠️ FAUCET CRITICAL: Only {percentageRemaining.toFixed(1)}% remaining!
                   </span>
                   <span className="font-normal text-sm">
-                    Claim your {formatLargeTokenAmount(currentReward)} tokens before depletion in {formatDepletionEstimate(faucet.globalStats.estimatedDaysRemaining)}!
+                    Claim your {formatLargeTokenAmount(currentReward)} tokens before depletion in {formatDepletionEstimate(faucet.globalStats?.estimatedDaysRemaining || 0)}!
                   </span>
                   {/* Large gap between messages for empty space */}
                   <div className="w-96"></div>
