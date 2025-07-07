@@ -133,6 +133,30 @@ const FaucetClaim: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-purple-900 transition-colors duration-200">
+
+      {/* Full-Width Marquee Banner for Low Faucet */}
+      {faucet.globalStats && percentageRemaining <= 25 && (
+        <div className="w-full bg-gradient-to-r from-red-500 via-orange-500 to-red-500 text-white overflow-hidden relative z-20">
+          <div className="marquee-container py-3">
+            <div className="marquee-content flex items-center animate-marquee">
+              {/* Repeat the content multiple times for seamless loop */}
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="flex items-center space-x-2 whitespace-nowrap">
+                  <span className="font-semibold text-sm">
+                    ⚠️ FAUCET CRITICAL: Only {percentageRemaining.toFixed(1)}% remaining!
+                  </span>
+                  <span className="font-normal text-sm">
+                    Claim your {formatLargeTokenAmount(currentReward)} tokens before depletion in {formatDepletionEstimate(faucet.globalStats.estimatedDaysRemaining)}!
+                  </span>
+                  {/* Large gap between messages for empty space */}
+                  <div className="w-96"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 px-6 py-12">
         <div className="max-w-6xl mx-auto">
 
@@ -155,7 +179,7 @@ const FaucetClaim: React.FC = () => {
             </p>
 
             {/* Urgency Banner */}
-            {faucet.globalStats && (
+            {faucet.globalStats && percentageRemaining <= 25 && (
               <div className="inline-flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full text-sm font-medium">
                 <Zap className="w-4 h-4" />
                 <span>Faucet depletes in {formatDepletionEstimate(faucet.globalStats.estimatedDaysRemaining)} • Claim now!</span>
